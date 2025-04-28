@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const cheerio = require('cheerio');
 const app = express();
 
 // Proxy route to forward the request
@@ -21,6 +22,7 @@ app.get('/proxy', async (req, res) => {
     try {
         console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
 
+        // Make the request to the yourcourts.com URL and retrieve the HTML response
         const response = await axios.get('https://www.yourcourts.com/facility/viewer/8353821', {
             params: {
                 reservationDate: reservationDate,
@@ -29,47 +31,45 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Check if the response is HTML instead of JSON
-        if (response.headers['content-type'].includes('html')) {
-            console.log('Received HTML instead of JSON. Full response body:');
-            console.log(response.data); // Log HTML content
-            return res.status(500).json({ error: 'Received HTML content instead of expected JSON. Check for authentication or other issues.' });
-        }
+        // If the response contains HTML, parse it using cheerio
+        const $ = cheerio.load(response.data);
 
-        // If the response contains data in JSON, continue processing
-        console.log('Raw Response Data:', response.data);
+        // You need to adjust this based on the structure of the HTML page
+        let reservations = [];
 
-        const reservations = response.data.reservations || [];
+        // For the sake of the example, assuming reservation data is inside a table
+        // Update this selector based on your actual HTML structure
+        $('table.reservation-table tr').each((index, element) => {
+            const time = $(element).find('.time').text().trim();
+            const username = $(element).find('.username').text().trim();
+            const nextUser = $(element).find('.next-user').text().trim();
 
-        if (!Array.isArray(reservations)) {
-            console.error('Reservations is not an array:', reservations);
-            return res.status(500).json({ error: 'Unexpected data format received from yourcourts.com' });
-        }
+            // Process each reservation (you may need to tweak this)
+            if (time !== 'Not open') {
+                let currentUser = '';
 
-        let processedSchedule = [];
+                if (time === 'Not available for rental' || time === 'Open') {
+                    currentUser = 'Not currently reserved';
+                } else if (['Setup time', 'Takedown time', 'Setup and takedown time'].includes(time)) {
+                    currentUser = username === 'Open' ? 'Not currently reserved' : username;
+                }
 
-        reservations.forEach(reservation => {
-            if (reservation.time === 'Not open') return;
-
-            let currentUser = '';
-            if (reservation.time === 'Not available for rental' || reservation.time === 'Open') {
-                currentUser = 'Not currently reserved';
-            } else if (['Setup time', 'Takedown time', 'Setup and takedown time'].includes(reservation.time)) {
-                currentUser = reservation.username === 'Open' ? 'Not currently reserved' : reservation.username;
+                reservations.push({
+                    time: time,
+                    currentUser: currentUser,
+                    nextUser: nextUser || 'No upcoming reservation'
+                });
             }
-
-            processedSchedule.push({
-                time: reservation.time,
-                currentUser: currentUser,
-                nextUser: reservation.nextUser || 'No upcoming reservation'
-            });
         });
 
-        console.log('Processed Schedule:', JSON.stringify(processedSchedule));
-        res.json(processedSchedule);
+        console.log('Processed Reservations:', JSON.stringify(reservations));
+
+        // Return the processed data as JSON
+        res.json(reservations);
+
     } catch (error) {
         console.error('Error fetching data from yourcourts.com:', error);
-        res.status(500).json({ error: 'Failed to fetch target URL' });
+        res.status(500).json({ error: 'Failed to fetch or parse data from yourcourts.com' });
     }
 });
 
