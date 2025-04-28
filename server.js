@@ -32,11 +32,36 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Log the response data to debug
-        console.log(`Received response from yourcourts.com: ${JSON.stringify(response.data)}`);
+        // Process the data (for brevity, assume 'data' contains the schedule information)
+        const reservations = response.data; // This should be an array or object containing reservation data
+        
+        // Create a processed schedule
+        let processedSchedule = [];
 
-        // Send the retrieved data back to the frontend
-        res.json(response.data);
+        reservations.forEach(reservation => {
+            // If the reservation time is "Not open", skip it
+            if (reservation.time === 'Not open') return;
+
+            let currentUser = '';
+            if (reservation.time === 'Not available for rental' || reservation.time === 'Open') {
+                currentUser = 'Not currently reserved';
+            } else if (['Setup time', 'Takedown time', 'Setup and takedown time'].includes(reservation.time)) {
+                currentUser = reservation.username === 'Open' ? 'Not currently reserved' : reservation.username;
+            }
+
+            // Add to processed schedule
+            processedSchedule.push({
+                time: reservation.time,
+                currentUser: currentUser,
+                nextUser: reservation.nextUser || 'No upcoming reservation'
+            });
+        });
+
+        // Log the processed schedule for debugging
+        console.log('Processed Schedule:', JSON.stringify(processedSchedule));
+
+        // Send the processed schedule back to the frontend
+        res.json(processedSchedule);
     } catch (error) {
         console.error('Error fetching data from yourcourts.com:', error);
         res.status(500).json({ error: 'Failed to fetch target URL' });
