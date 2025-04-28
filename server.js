@@ -20,7 +20,11 @@ app.get('/proxy', async (req, res) => {
         const html = response.data;
         const $ = cheerio.load(html);
 
-        const now = DateTime.now().setZone('America/Los_Angeles'); // Adjust timezone if needed
+        console.log('==== BEGIN HTML SNIPPET ====');
+        console.log($('#calendarTable tbody').html());
+        console.log('==== END HTML SNIPPET ====');
+
+        const now = DateTime.now().setZone('America/Los_Angeles');
 
         let reservations = [];
         let currentReservation = null;
@@ -29,16 +33,16 @@ app.get('/proxy', async (req, res) => {
             const timeText = $(element).find('td:nth-child(1)').text().trim();
             const userText = $(element).find('td:nth-child(2)').text().trim();
 
+            console.log(`Row ${index}: Time - ${timeText}, User - ${userText}`);
+
             if (!timeText) return; // Skip empty rows
 
-            // Parse the time
             let rowTime = DateTime.fromFormat(timeText, 'h:mma', { zone: 'America/Los_Angeles' });
             if (!rowTime.isValid) {
                 console.log(`Invalid time format: ${timeText}`);
                 return;
             }
 
-            // If this is the first block or user changed, start new reservation
             if (!currentReservation || currentReservation.user !== userText) {
                 if (currentReservation) {
                     currentReservation.end = rowTime;
@@ -47,23 +51,20 @@ app.get('/proxy', async (req, res) => {
                 currentReservation = {
                     user: userText,
                     start: rowTime,
-                    end: null // to be filled later
+                    end: null
                 };
             }
         });
 
-        // Push the last reservation if exists
         if (currentReservation) {
             currentReservation.end = currentReservation.start.plus({ minutes: 30 });
             reservations.push(currentReservation);
         }
 
-        // Fix end times (fill gaps)
         for (let i = 0; i < reservations.length - 1; i++) {
             reservations[i].end = reservations[i + 1].start;
         }
 
-        // Find current and next users
         let currentUser = null;
         let nextUser = null;
 
@@ -75,7 +76,6 @@ app.get('/proxy', async (req, res) => {
             }
         }
 
-        // Clean up current user based on rules
         if (currentUser) {
             if (['Open', 'Not available for rental'].includes(currentUser)) {
                 currentUser = 'Not currently reserved';
