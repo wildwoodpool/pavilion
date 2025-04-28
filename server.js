@@ -16,7 +16,10 @@ app.get('/proxy', async (req, res) => {
     }
 
     try {
-        const response = await axios.get(baseUrl);
+        // Ensure the correct URL for Pavilion Rentals with court_id=15094
+        const correctUrl = baseUrl.includes('court_id=15094') ? baseUrl : `${baseUrl}&court_id=15094`;
+
+        const response = await axios.get(correctUrl);
         const html = response.data;
         const $ = cheerio.load(html);
 
