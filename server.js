@@ -20,8 +20,9 @@ app.get('/proxy', async (req, res) => {
         const html = response.data;
         const $ = cheerio.load(html);
 
+        // Log the entire HTML to check the table structure
         console.log('==== BEGIN HTML SNIPPET ====');
-        console.log($('#calendarTable tbody').html());
+        console.log('All HTML:', html);  // Log the entire HTML to check table structure
         console.log('==== END HTML SNIPPET ====');
 
         const now = DateTime.now().setZone('America/Los_Angeles');
