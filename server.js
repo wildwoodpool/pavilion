@@ -1,12 +1,17 @@
-// server.js
-
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const dayjs = require('dayjs');
+const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const TIMEZONE = 'America/New_York';
 
 app.use(cors());
 
@@ -14,83 +19,86 @@ app.get('/proxy', async (req, res) => {
   try {
     let { reservationDate, facility_id, court_id } = req.query;
 
-    // If no reservationDate provided, use today's date in MM/DD/YYYY
     if (!reservationDate) {
-      reservationDate = dayjs().format('M/D/YYYY');
+      reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
     }
 
-    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
-    console.log('Fetching data from:', url);
+    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&court_id=${court_id}&reservationDate=${reservationDate}`;
+    console.log(`Fetching data from ${url}`);
 
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
 
     const reservationsRaw = [];
 
-    $('tr.reservation').each((i, el) => {
-      const time = $(el).find('td.reservation-time').text().trim();
-      const status = $(el).find('td.reservation-user').text().trim();
+    $('.calendar_holder .calendar_cell').each((_, el) => {
+      const timeText = $(el).find('.time').text().trim();
+      const reservationText = $(el).find('.reservation').text().trim();
+      const backgroundColor = $(el).find('.reservation').css('background-color');
 
-      if (time) {
+      if (timeText) {
         reservationsRaw.push({
-          startTime: time,
-          status: status || ''
+          startTime: formatTime(timeText),
+          status: reservationText || timeText, // If no reservation text, use timeText
+          color: backgroundColor,
         });
       }
     });
 
-    // --- STEP 1: Remove placeholders (status equals startTime) ---
-    let reservations = reservationsRaw.filter(r => r.status.toLowerCase() !== r.startTime.toLowerCase());
+    // Step 1: Remove placeholders (status === startTime)
+    const filteredReservations = reservationsRaw.filter(r => r.status !== r.startTime);
 
-    // --- STEP 2: Merge consecutive identical events ---
-    const mergedReservations = [];
-    let i = 0;
-
-    while (i < reservations.length) {
-      const current = reservations[i];
+    // Step 2: Merge identical back-to-back events even across placeholders
+    const merged = [];
+    for (let i = 0; i < filteredReservations.length; i++) {
+      const current = { ...filteredReservations[i] };
       let j = i + 1;
 
-      while (j < reservations.length && normalizeStatus(reservations[j].status) === normalizeStatus(current.status)) {
+      while (
+        j < filteredReservations.length &&
+        cleanStatus(filteredReservations[j].status) === cleanStatus(current.status)
+      ) {
         j++;
       }
 
-      const endTime = reservations[j - 1].startTime;
-      mergedReservations.push({
-        startTime: current.startTime,
-        status: cleanStatus(current.status),
-        endTime: endTime
-      });
-
-      i = j;
+      current.endTime = filteredReservations[j] ? filteredReservations[j].startTime : current.startTime;
+      merged.push(current);
+      i = j - 1;
     }
 
-    // --- STEP 3: Set correct end times for everything ---
-    for (let k = 0; k < mergedReservations.length; k++) {
-      if (k < mergedReservations.length - 1) {
-        mergedReservations[k].endTime = mergedReservations[k + 1].startTime;
-      } else {
-        mergedReservations[k].endTime = mergedReservations[k].startTime; // last item
+    // Step 3: Adjust endTimes for the rest
+    for (let i = 0; i < merged.length - 1; i++) {
+      if (!merged[i].endTime) {
+        merged[i].endTime = merged[i + 1].startTime;
       }
     }
+    if (!merged[merged.length - 1].endTime) {
+      merged[merged.length - 1].endTime = merged[merged.length - 1].startTime;
+    }
 
-    // --- STEP 4: Filter out unwanted statuses for display ---
-    const displayReservations = mergedReservations.filter(r => {
-      const unwanted = ['setup time', 'takedown time', 'open', 'not available for rental'];
-      return !unwanted.includes(r.status.toLowerCase());
-    });
+    // Step 4: Clean output (remove unwanted events)
+    const ignoreList = ['Setup time', 'Takedown time', 'Open', 'Not available for rental'];
 
-    console.table(displayReservations);
+    const finalReservations = merged
+      .map(r => ({
+        startTime: r.startTime,
+        endTime: r.endTime,
+        status: cleanStatus(r.status),
+      }))
+      .filter(r => r.status && !ignoreList.includes(r.status));
 
-    res.json({ reservations: displayReservations });
+    console.table(finalReservations);
 
+    res.json({ reservations: finalReservations });
   } catch (error) {
     console.error('Error fetching data from yourcourts.com:', error.message);
     res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
-function normalizeStatus(status) {
-  return cleanStatus(status).toLowerCase();
+function formatTime(timeStr) {
+  // Normalize spacing
+  return dayjs(timeStr, ['h:mma', 'h:mmA']).format('h:mmA');
 }
 
 function cleanStatus(status) {
