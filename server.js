@@ -1,16 +1,20 @@
-// FINAL FIXED server.js
+// FINAL corrected server.js
 
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const TIMEZONE = 'America/New_York';
 
 app.use(cors());
-
-const TIMEZONE = 'America/New_York';
 
 app.get('/proxy', async (req, res) => {
   try {
@@ -28,14 +32,14 @@ app.get('/proxy', async (req, res) => {
 
     const rawReservations = [];
 
-    // Correctly scrape each table row for time and reservation text
+    // Correct scraping: only pick rows that have a valid time
     $('tr').each((_, el) => {
       const timeText = $(el).find('td.court-time').text().trim();
       const statusText = $(el).find('td').eq(1).text().trim();
 
-      if (timeText) {
+      if (isValidTime(timeText)) {
         rawReservations.push({
-          startTime: formatTime(timeText),
+          startTime: timeText,
           status: statusText || timeText
         });
       }
@@ -44,7 +48,7 @@ app.get('/proxy', async (req, res) => {
     // Step 1: Remove placeholders (status = startTime)
     const filtered = rawReservations.filter(r => r.status !== r.startTime);
 
-    // Step 2: Merge identical events across placeholders
+    // Step 2: Merge identical consecutive events
     const merged = [];
     let i = 0;
     while (i < filtered.length) {
@@ -60,7 +64,7 @@ app.get('/proxy', async (req, res) => {
       i = j;
     }
 
-    // Step 3: Remove unwanted statuses
+    // Step 3: Remove unwanted statuses and clean "Member Event"
     const ignoreStatuses = ['Setup time', 'Takedown time', 'Open', 'Not available for rental'];
     const cleaned = merged.map(r => ({
       startTime: r.startTime,
@@ -68,9 +72,12 @@ app.get('/proxy', async (req, res) => {
       status: cleanStatus(r.status)
     })).filter(r => r.status && !ignoreStatuses.includes(r.status));
 
-    // Step 4: Adjust end times
+    // Step 4: Adjust end times again if needed
     for (let k = 0; k < cleaned.length - 1; k++) {
       cleaned[k].endTime = cleaned[k + 1].startTime;
+    }
+    if (cleaned.length > 0 && !cleaned[cleaned.length - 1].endTime) {
+      cleaned[cleaned.length - 1].endTime = cleaned[cleaned.length - 1].startTime;
     }
 
     console.table(cleaned);
@@ -83,8 +90,8 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-function formatTime(timeStr) {
-  return dayjs(timeStr, ['h:mmA', 'h:mm a', 'h:mma', 'h:mma']).format('h:mmA');
+function isValidTime(str) {
+  return /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)$/i.test(str);
 }
 
 function cleanStatus(status) {
