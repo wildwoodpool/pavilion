@@ -20,6 +20,9 @@ app.get('/proxy', async (req, res) => {
     }
 
     try {
+        // Log before sending the request to yourcourts.com
+        console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
+
         // Sending request to the actual schedule page on yourcourts.com
         const response = await axios.get('https://www.yourcourts.com/facility/viewer/8353821', {
             params: {
@@ -28,6 +31,9 @@ app.get('/proxy', async (req, res) => {
                 court_id: court_id
             }
         });
+
+        // Log the response data to debug
+        console.log(`Received response from yourcourts.com: ${JSON.stringify(response.data)}`);
 
         // Send the retrieved data back to the frontend
         res.json(response.data);
