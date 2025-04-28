@@ -35,7 +35,7 @@ app.get('/proxy', async (req, res) => {
         const cleanHtml = response.data.replace(/<!--[\s\S]*?-->/g, '');
 
         // Log more of the cleaned HTML response to inspect the structure
-        console.log("Cleaned HTML response (first 1000 characters):", cleanHtml.slice(0, 1000));
+        console.log("Cleaned HTML response (first 3000 characters):", cleanHtml.slice(0, 3000));
 
         // If the response contains HTML, parse it using cheerio
         const $ = cheerio.load(cleanHtml);
