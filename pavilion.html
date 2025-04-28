@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pavilion Rentals - Room Schedule</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    h1 { font-size: 2em; }
+    #current, #next { margin-top: 20px; font-size: 1.5em; }
+  </style>
+</head>
+<body>
+
+<h1>Pavilion Rentals - Live Status</h1>
+
+<div id="current">Loading current user...</div>
+<div id="next">Loading next user...</div>
+
+<script>
+const proxyURL = 'https://corsproxy.io/?';
+const targetURL = 'https://www.yourcourts.com/facility/viewer/8353821?facility_id=2103&court_id=15094';
+
+async function loadSchedule() {
+  try {
+    const response = await fetch(proxyURL + encodeURIComponent(targetURL));
+    const text = await response.text();
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    
+    const table = doc.querySelector('.calendar_table');
+    if (!table) {
+      document.getElementById('current').innerText = "No schedule table found.";
+      return;
+    }
+
+    const rows = table.querySelectorAll('tr');
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let entries = [];
+
+    rows.forEach((row, index) => {
+      if (index === 0) return; // skip the header row
+
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 2) return; // Need at least time and one court
+
+      const timeStr = cells[0].innerText.trim();
+      const user = cells[1].innerText.trim(); // Assume first court column
+
+      let match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+      if (match) {
+        let hour = parseInt(match[1], 10);
+        let minute = parseInt(match[2], 10);
+        let ampm = match[3].toUpperCase();
+
+        if (ampm === 'PM' && hour !== 12) hour += 12;
+        if (ampm === 'AM' && hour === 12) hour = 0;
+
+        const minutesSinceMidnight = hour * 60 + minute;
+        entries.push({ minutes: minutesSinceMidnight, user });
+      }
+    });
+
+    entries.sort((a, b) => a.minutes - b.minutes);
+
+    let currentUser = "Room is free";
+    let nextUser = "No upcoming booking";
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const nextEntry = entries[i + 1];
+
+      if (entry.minutes <= currentMinutes && (!nextEntry || currentMinutes < nextEntry.minutes)) {
+        currentUser = (entry.user && entry.user !== "Available") ? entry.user : "Room is free";
+        nextUser = nextEntry ? (nextEntry.user && nextEntry.user !== "Available" ? nextEntry.user : "Room is free") : "No one next";
+        break;
+      }
+      if (currentMinutes < entry.minutes) {
+        nextUser = (entry.user && entry.user !== "Available") ? entry.user : "Room is free";
+        break;
+      }
+    }
+
+    document.getElementById('current').innerText = "Current: " + currentUser;
+    document.getElementById('next').innerText = "Next: " + nextUser;
+  } catch (error) {
+    console.error("Error fetching schedule:", error);
+    document.getElementById('current').innerText = "Error loading schedule.";
+    document.getElementById('next').innerText = "";
+  }
+}
+
+// Load once when the page loads
+loadSchedule();
+
+// Optionally refresh every minute
+setInterval(loadSchedule, 60000);
+</script>
+
+</body>
+</html>
