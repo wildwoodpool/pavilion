@@ -1,61 +1,99 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const app = express();
-const PORT = process.env.PORT || 3000;
 
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Helper function to process the raw data into the required format
+const processReservations = (html) => {
+    const $ = cheerio.load(html);
+    const reservations = [];
+
+    $('tr').each((i, element) => {
+        const time = $(element).find('.court-time').text().trim();
+        const status = $(element).find('td').last().text().trim();
+        const color = $(element).find('td').last().css('background-color');
+
+        if (time && status && color) {
+            // Clean up the status to remove "Member Event" text
+            const cleanedStatus = status.includes('Member Event')
+                ? status.replace('Member Event', '').trim()
+                : status;
+
+            reservations.push({
+                time,
+                status: cleanedStatus,
+                color,
+            });
+        }
+    });
+
+    // Group back-to-back reservations with the same status
+    const groupedReservations = [];
+    let currentGroup = null;
+
+    reservations.forEach((reservation) => {
+        if (currentGroup && currentGroup.status === reservation.status) {
+            // Merge back-to-back reservations with the same status
+            currentGroup.endTime = reservation.time;
+        } else {
+            if (currentGroup) groupedReservations.push(currentGroup);
+            currentGroup = { ...reservation, startTime: reservation.time, endTime: reservation.time };
+        }
+    });
+
+    if (currentGroup) groupedReservations.push(currentGroup);
+
+    return groupedReservations;
+};
+
+// Define the route to fetch reservations
 app.get('/proxy', async (req, res) => {
     const { reservationDate, facility_id, court_id } = req.query;
-    console.log('Received Query Parameters:', { reservationDate, facility_id, court_id });
+
+    if (!reservationDate || !facility_id || !court_id) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+    }
 
     try {
-        // Correct URL structure
-        const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
-        console.log(`Fetching data from ${url}`);
+        const url = `https://www.yourcourts.com/facility/viewer/${facility_id}?reservationDate=${reservationDate}&court_id=${court_id}`;
+        console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
 
         const response = await axios.get(url);
         const html = response.data;
 
-        // Load the HTML into Cheerio
-        const $ = cheerio.load(html);
+        console.log('Formatted HTML content received (first 2000 chars):');
+        console.log(html.slice(0, 2000)); // Just log the first 2000 characters for brevity
 
-        // Log a formatted snippet of <body> content (first 2000 characters)
-        const bodyHtml = $('body').html()?.replace(/<!--[\s\S]*?-->/g, '') || '';
-        console.log('Formatted HTML <body> Content (first 2000 chars):');
-        console.log(bodyHtml.slice(0, 2000));
+        const processedReservations = processReservations(html);
+        console.log('Processed Reservations:', processedReservations);
 
-        const reservations = [];
-
-        // Scrape time slots and their statuses
-        $('tr[id]').each((_, tr) => {
-            const time = $(tr).find('td.court-time').text().trim();
-            const statusCell = $(tr).find('td').not('.court-time').first();
-            const statusText = statusCell.text().trim();
-            const statusColor = statusCell.css('background-color');
-
-            if (time && statusText) {
-                reservations.push({
-                    time,
-                    status: statusText,
-                    color: statusColor
-                });
-            }
-        });
-
-        if (reservations.length > 0) {
-            console.log('Processed Reservations:', reservations);
-            res.json(reservations);
-        } else {
-            console.log('No reservations found.');
-            res.json({ message: 'No reservations found for this date and court.' });
+        // Check if there are any reservations
+        if (processedReservations.length === 0) {
+            return res.json({ message: 'No reservations today.' });
         }
 
+        // Find the current and next reservations
+        const currentReservation = processedReservations[0]; // First reservation of the day
+        const nextReservation = processedReservations[1] || { time: 'No more reservations today' };
+
+        // Format the reservation response
+        const responseData = {
+            currentUser: `${currentReservation.startTime} - ${currentReservation.endTime} ${currentReservation.status}`,
+            nextUser: nextReservation.time !== 'No more reservations today'
+                ? `${nextReservation.startTime} - ${nextReservation.endTime} ${nextReservation.status}`
+                : 'No more reservations today',
+        };
+
+        return res.json(responseData);
     } catch (error) {
-        console.error('Error fetching or processing data:', error.message);
-        res.status(500).json({ error: 'Failed to fetch or process reservation data.' });
+        console.error('Error fetching data from yourcourts.com:', error);
+        return res.status(500).json({ error: 'Error fetching data from yourcourts.com' });
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Start the server
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
 });
