@@ -1,84 +1,119 @@
 const axios = require('axios');
-const cheerio = require('cheerio');
 const dayjs = require('dayjs');
 const express = require('express');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.use(cors());
 
-app.get('/proxy', async (req, res) => {
-  const { reservationDate, facility_id, court_id } = req.query;
+// Helper function to clean up event descriptions, remove placeholders, and merge identical events.
+function cleanAndFormatReservations(reservations) {
+  let mergedReservations = [];
 
-  try {
-    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate || dayjs().format('M/D/YYYY')}&court_id=${court_id}`;
-    const { data } = await axios.get(url);
+  // Step 1: Merge identical consecutive events and remove placeholders in between
+  let currentEvent = null;
 
-    const $ = cheerio.load(data);
-    const reservations = [];
+  for (let i = 0; i < reservations.length; i++) {
+    let reservation = reservations[i];
 
-    // Parsing the reservation times
-    $('tr').each((i, row) => {
-      const startTime = $(row).find('.court-time').text().trim();
-      const status = $(row).find('td').last().text().trim();
-
-      // Skip rows where startTime equals status, "Open", or contains Setup or Takedown
-      if (!startTime || status === startTime || status === 'Open' || status.includes('Setup') || status.includes('Takedown')) return;
-
-      // Add the reservation if it's valid
-      const endTime = $(row).next().find('.court-time').text().trim() || startTime;
-
-      reservations.push({ startTime, status, endTime });
-    });
-
-    // Now group back-to-back events with the same text into one reservation
-    const groupedReservations = [];
-    let currentReservation = null;
-
-    reservations.forEach((res, index) => {
-      // Check if the next reservation exists
-      const nextReservation = reservations[index + 1];
-
-      if (nextReservation && currentReservation && currentReservation.status === res.status && dayjs(currentReservation.endTime, 'h:mma').isSame(dayjs(res.startTime, 'h:mma'))) {
-        // Extend the end time of the current reservation to the next reservation's start time
-        currentReservation.endTime = nextReservation.startTime;
-      } else {
-        if (currentReservation) groupedReservations.push(currentReservation);
-        currentReservation = { ...res };
-      }
-    });
-
-    // Add the last reservation
-    if (currentReservation) groupedReservations.push(currentReservation);
-
-    // Now check for empty slots (start time == status) between two identical status events
-    const finalReservations = [];
-    for (let i = 0; i < groupedReservations.length; i++) {
-      const curr = groupedReservations[i];
-      const next = groupedReservations[i + 1];
-
-      // If there's a gap between two identical events, merge them
-      if (next && curr.status === next.status && !dayjs(curr.endTime, 'h:mma').isBefore(dayjs(next.startTime, 'h:mma'))) {
-        curr.endTime = next.endTime;
-        continue;  // Skip the next reservation because it’s merged into the current one
-      }
-
-      finalReservations.push(curr);
+    // Step 1a: Skip placeholders (events where the start time and status are identical)
+    if (reservation.startTime === reservation.status || 
+        ['Setup time', 'Open', 'Not available for rental'].includes(reservation.status)) {
+      continue;
     }
 
-    // Format as a table for output
-    console.table(finalReservations);
+    // Step 1b: Merge consecutive identical events
+    if (currentEvent && currentEvent.status === reservation.status) {
+      // Merge events by setting the current event's end time to the next event's end time
+      currentEvent.endTime = reservation.endTime;
+    } else {
+      // If not identical, push the current event (if any) to the merged list
+      if (currentEvent) {
+        mergedReservations.push(currentEvent);
+      }
 
-    res.json(finalReservations);
-
-  } catch (error) {
-    console.error('Error fetching data from yourcourts.com:', error);
-    res.status(500).json({ message: 'Error fetching reservation data' });
+      // Set current event to the new event
+      currentEvent = { ...reservation };
+    }
   }
+
+  // Don't forget to add the last event
+  if (currentEvent) {
+    mergedReservations.push(currentEvent);
+  }
+
+  // Step 2: Remove "Member Event" from the status
+  mergedReservations = mergedReservations.map(reservation => {
+    // Remove "Member Event" from the status description
+    reservation.status = reservation.status.replace('Member Event', '').trim();
+
+    // Step 3: Remove events like "Setup time", "Open", etc. from the output
+    if (['Setup time', 'Open', 'Not available for rental'].includes(reservation.status)) {
+      return null;
+    }
+
+    return reservation;
+  }).filter(reservation => reservation !== null);  // Remove any nulls caused by exclusion
+
+  // Step 4: Adjust end times to match the start time of the next event
+  for (let i = 0; i < mergedReservations.length - 1; i++) {
+    mergedReservations[i].endTime = mergedReservations[i + 1].startTime;
+  }
+
+  return mergedReservations;
+}
+
+// Function to fetch reservation data
+async function fetchReservations(facility_id, reservationDate, court_id) {
+  const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching data from yourcourts.com: ${error}`);
+    return null;
+  }
+}
+
+// Function to format and return the day’s reservations as a human-readable table
+function formatReservationsAsTable(reservations) {
+  let table = "┌─────────┬───────────┬────────────────────────────┬──────────┐\n";
+  table += "│ (index) │ startTime │ status                     │ endTime  │\n";
+  table += "├─────────┼───────────┼────────────────────────────┼──────────┤\n";
+
+  reservations.forEach((reservation, index) => {
+    table += `│ ${String(index).padEnd(9)} │ ${reservation.startTime.padEnd(10)} │ ${reservation.status.padEnd(25)} │ ${reservation.endTime.padEnd(10)} │\n`;
+  });
+
+  table += "└─────────┴───────────┴────────────────────────────┴──────────┘\n";
+  return table;
+}
+
+app.get('/schedule', async (req, res) => {
+  const { facility_id, reservationDate, court_id } = req.query;
+  
+  if (!facility_id || !reservationDate || !court_id) {
+    return res.status(400).send("Missing required query parameters.");
+  }
+
+  // Fetch reservation data
+  const data = await fetchReservations(facility_id, reservationDate, court_id);
+
+  if (!data || !data.reservations) {
+    return res.status(500).send("Error fetching reservation data.");
+  }
+
+  // Process the reservations according to the rules
+  const processedReservations = cleanAndFormatReservations(data.reservations);
+
+  // Format the reservations into a table for display
+  const table = formatReservationsAsTable(processedReservations);
+
+  // Send the table back as a response
+  res.send(table);
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
