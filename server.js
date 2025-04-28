@@ -9,13 +9,20 @@ app.use(cors());
 // Define the /proxy route
 app.get('/proxy', async (req, res) => {
     const targetUrl = req.query.url;
+    const reservationDate = req.query.reservationDate; // Extract the reservation date from the query
 
     if (!targetUrl) {
         return res.status(400).send('Missing url parameter');
     }
 
     try {
-        const response = await fetch(targetUrl);
+        // If a reservationDate is provided, append it to the target URL
+        let fullUrl = targetUrl;
+        if (reservationDate) {
+            fullUrl += `&reservationDate=${reservationDate}`;
+        }
+
+        const response = await fetch(fullUrl);
 
         if (!response.ok) {
             throw new Error(`Fetch failed with status: ${response.status}`);
@@ -32,6 +39,7 @@ app.get('/proxy', async (req, res) => {
         const currentTime = new Date();
         let currentUser = null;
         let nextUser = null;
+        let ongoingReservation = null;
 
         rows.each((index, row) => {
             const cells = $(row).find('td');
@@ -40,17 +48,33 @@ app.get('/proxy', async (req, res) => {
             
             console.log(`Row ${index + 1}: Time - ${timeCell}, User - ${userCell}`); // Debugging log
 
-            // Convert the time in the table to a Date object (adjust format)
-            const scheduleTime = new Date(`1970-01-01T${timeCell}:00Z`); // Adjust as necessary
+            // If the time is "Not open" or similar, skip processing it
+            if (userCell === "Not open") {
+                return; // Skip processing
+            }
 
-            console.log(`Parsed schedule time: ${scheduleTime}`); // Debugging log
+            // Handle special cases for time/status
+            if (userCell === "Not available for rental" || userCell === "Open") {
+                currentUser = "Not currently reserved";
+            } else if (userCell === "Setup time" || userCell === "Takedown time" || userCell === "Setup and takedown time") {
+                currentUser = userCell; // User info for setup/takedown time
+            } else if (userCell !== "Not open") {
+                currentUser = userCell; // Set the current user if there's a valid reservation
+            }
 
-            if (scheduleTime <= currentTime && !currentUser) {
-                currentUser = userCell; // The first user that matches or is before the current time
-            } else if (scheduleTime > currentTime && !nextUser) {
+            // Parse the time and check against the current time
+            const scheduleTime = parseScheduleTime(timeCell);
+            if (scheduleTime && scheduleTime <= currentTime && !nextUser) {
+                ongoingReservation = userCell; // Identify ongoing reservation
+            } else if (scheduleTime && scheduleTime > currentTime && !nextUser) {
                 nextUser = userCell; // The first user after the current time
             }
         });
+
+        // If no current user found, adjust output
+        if (!currentUser) {
+            currentUser = "Not currently reserved"; // Default to "Not currently reserved" if no user found
+        }
 
         res.json({ currentUser, nextUser });
     } catch (error) {
@@ -58,6 +82,29 @@ app.get('/proxy', async (req, res) => {
         res.status(500).send(`Error fetching target URL: ${error.message}`);
     }
 });
+
+// Helper function to parse time in "HH:MMAM/PM" format to a Date object
+function parseScheduleTime(timeString) {
+    const match = timeString.match(/^(\d{1,2}):(\d{2})(AM|PM)$/i);
+    if (!match) return null; // Return null if the time format doesn't match
+
+    let [ , hour, minute, period ] = match;
+
+    hour = parseInt(hour);
+    minute = parseInt(minute);
+
+    if (period.toUpperCase() === "PM" && hour !== 12) {
+        hour += 12;
+    }
+    if (period.toUpperCase() === "AM" && hour === 12) {
+        hour = 0; // Midnight case
+    }
+
+    // Return a Date object representing the time (using today's date)
+    const now = new Date();
+    now.setHours(hour, minute, 0, 0);
+    return now;
+}
 
 // Start the server
 const port = process.env.PORT || 3000;
