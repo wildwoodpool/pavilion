@@ -1,112 +1,84 @@
 const express = require('express');
-const cors = require('cors');
 const axios = require('axios');
+const cors = require('cors');
 const cheerio = require('cheerio');
-const { DateTime } = require('luxon');
-
 const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Enable CORS
 app.use(cors());
 
-const PORT = process.env.PORT || 3000;
-
+// Create a route for fetching and parsing the data
 app.get('/proxy', async (req, res) => {
-    const baseUrl = req.query.url;
-    if (!baseUrl) {
-        return res.status(400).send('Missing url parameter');
-    }
-
     try {
-        // Ensure the correct URL for Pavilion Rentals with court_id=15094
-        const correctUrl = baseUrl.includes('court_id=15094') ? baseUrl : `${baseUrl}&court_id=15094`;
+        // Ensure URL is passed and valid
+        const targetUrl = req.query.url;
+        if (!targetUrl) {
+            return res.status(400).send('URL parameter is required');
+        }
 
-        const response = await axios.get(correctUrl);
-        const html = response.data;
-        const $ = cheerio.load(html);
+        // Make HTTP request to the target URL (Pavilion Rentals specific URL)
+        const response = await axios.get(targetUrl);
 
-        // Log the entire HTML to check the table structure
-        console.log('==== BEGIN HTML SNIPPET ====');
-        console.log('All HTML:', html);  // Log the entire HTML to check table structure
-        console.log('==== END HTML SNIPPET ====');
+        // Parse the HTML content with Cheerio
+        const $ = cheerio.load(response.data);
+        
+        // Look for the table that contains the schedule data (may need adjustment based on actual HTML structure)
+        const scheduleRows = $('.schedule-table').find('tr');
 
-        const now = DateTime.now().setZone('America/Los_Angeles');
+        const reservations = [];
+        
+        // Loop through each row and extract the schedule information
+        scheduleRows.each((i, row) => {
+            const time = $(row).find('td.time').text().trim();
+            const user = $(row).find('td.user').text().trim();
 
-        let reservations = [];
-        let currentReservation = null;
-
-        $('#calendarTable tbody tr').each((index, element) => {
-            const timeText = $(element).find('td:nth-child(1)').text().trim();
-            const userText = $(element).find('td:nth-child(2)').text().trim();
-
-            console.log(`Row ${index}: Time - ${timeText}, User - ${userText}`);
-
-            if (!timeText) return; // Skip empty rows
-
-            let rowTime = DateTime.fromFormat(timeText, 'h:mma', { zone: 'America/Los_Angeles' });
-            if (!rowTime.isValid) {
-                console.log(`Invalid time format: ${timeText}`);
-                return;
-            }
-
-            if (!currentReservation || currentReservation.user !== userText) {
-                if (currentReservation) {
-                    currentReservation.end = rowTime;
-                    reservations.push(currentReservation);
-                }
-                currentReservation = {
-                    user: userText,
-                    start: rowTime,
-                    end: null
-                };
+            // Adjust logic here to match the content of your table
+            if (time && user) {
+                reservations.push({ time, user });
             }
         });
 
-        if (currentReservation) {
-            currentReservation.end = currentReservation.start.plus({ minutes: 30 });
-            reservations.push(currentReservation);
+        // Process the reservations
+        let currentUser = "Not currently reserved";
+        let nextUser = "No upcoming reservation";
+
+        // Get the date from the query params (or use the current date if not provided)
+        const reservationDate = req.query.reservationDate ? new Date(req.query.reservationDate) : new Date();
+
+        // Adjust time parsing and compare with the current date/time
+        const currentTimeSlot = reservations.find((reservation) => {
+            const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
+            return reservationTime <= new Date() && reservationTime.getTime() > new Date().getTime() - 30 * 60 * 1000;
+        });
+
+        // Logic to display next user
+        const nextTimeSlot = reservations.find((reservation) => {
+            const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
+            return reservationTime > new Date();
+        });
+
+        if (currentTimeSlot && currentTimeSlot.user !== "Not open") {
+            currentUser = currentTimeSlot.user === "Open" ? "Not currently reserved" : currentTimeSlot.user;
         }
 
-        for (let i = 0; i < reservations.length - 1; i++) {
-            reservations[i].end = reservations[i + 1].start;
+        if (nextTimeSlot) {
+            nextUser = nextTimeSlot.user === "Open" ? "Not currently reserved" : nextTimeSlot.user;
         }
 
-        let currentUser = null;
-        let nextUser = null;
-
-        for (const resv of reservations) {
-            if (now >= resv.start && now < resv.end) {
-                currentUser = resv.user;
-            } else if (now < resv.start && !nextUser) {
-                nextUser = resv.user;
-            }
-        }
-
-        if (currentUser) {
-            if (['Open', 'Not available for rental'].includes(currentUser)) {
-                currentUser = 'Not currently reserved';
-            } else if (['Not open'].includes(currentUser)) {
-                currentUser = null;
-            }
-        }
-
-        if (nextUser) {
-            if (['Open', 'Not available for rental'].includes(nextUser)) {
-                nextUser = 'Not currently reserved';
-            } else if (['Not open'].includes(nextUser)) {
-                nextUser = null;
-            }
-        }
-
+        // Send back the parsed results
         res.json({
             currentUser,
             nextUser
         });
 
     } catch (error) {
-        console.error('Error fetching or parsing:', error.message);
-        res.status(500).send('Error fetching target URL');
+        console.error('Error fetching target URL:', error);
+        res.status(500).send('Error fetching data');
     }
 });
 
+// Start the server
 app.listen(PORT, () => {
-    console.log(`Proxy server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
