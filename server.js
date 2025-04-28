@@ -39,29 +39,35 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Process the reservations
-        let currentUser = "Not currently reserved";
-        let nextUser = "No upcoming reservation";
+        // Log only relevant information for debugging
+        console.log('Reservations (first 5 rows for brevity):', reservations.slice(0, 5));
 
         // Get the date from the query params (or use the current date if not provided)
         const reservationDate = req.query.reservationDate ? new Date(req.query.reservationDate) : new Date();
+        console.log('Reservation Date:', reservationDate.toISOString());
 
         // Adjust time parsing and compare with the current date/time
         const currentTimeSlot = reservations.find((reservation) => {
             const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
+            console.log('Comparing with current time:', reservationTime);
             return reservationTime <= new Date() && reservationTime.getTime() > new Date().getTime() - 30 * 60 * 1000;
         });
 
         // Logic to display next user
         const nextTimeSlot = reservations.find((reservation) => {
             const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
+            console.log('Next reservation:', reservationTime);
             return reservationTime > new Date();
         });
 
+        // Process the current user
+        let currentUser = "Not currently reserved";
         if (currentTimeSlot && currentTimeSlot.user !== "Not open") {
             currentUser = currentTimeSlot.user === "Open" ? "Not currently reserved" : currentTimeSlot.user;
         }
 
+        // Process the next user
+        let nextUser = "No upcoming reservation";
         if (nextTimeSlot) {
             nextUser = nextTimeSlot.user === "Open" ? "Not currently reserved" : nextTimeSlot.user;
         }
