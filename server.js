@@ -24,9 +24,10 @@ app.get('/proxy', async (req, res) => {
       const startTime = $(row).find('.court-time').text().trim();
       const status = $(row).find('td').last().text().trim();
 
-      // Skip rows with no relevant data
-      if (!startTime || status === 'Open' || status.includes('Setup') || status.includes('Takedown')) return;
+      // Skip rows where startTime equals status
+      if (!startTime || status === startTime || status === 'Open' || status.includes('Setup') || status.includes('Takedown')) return;
 
+      // Add the reservation if it's valid
       const endTime = $(row).next().find('.court-time').text().trim() || startTime;
 
       reservations.push({ startTime, status, endTime });
