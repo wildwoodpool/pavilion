@@ -32,10 +32,19 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Process the data (for brevity, assume 'data' contains the schedule information)
-        const reservations = response.data; // This should be an array or object containing reservation data
+        // Log the full response data to see its structure
+        console.log('Raw Response Data:', response.data);
+
+        // Assuming the data comes in a nested structure, inspect its contents:
+        const reservations = response.data.reservations || []; // Adjust based on actual response structure
         
-        // Create a processed schedule
+        // If reservations is not an array, log an error
+        if (!Array.isArray(reservations)) {
+            console.error('Reservations is not an array:', reservations);
+            return res.status(500).json({ error: 'Unexpected data format received from yourcourts.com' });
+        }
+
+        // Process the data into a format we can display
         let processedSchedule = [];
 
         reservations.forEach(reservation => {
