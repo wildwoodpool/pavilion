@@ -4,7 +4,6 @@ const app = express();
 
 // Proxy route to forward the request
 app.get('/proxy', async (req, res) => {
-    // Extract parameters from query string
     const { reservationDate, facility_id, court_id } = req.query;
 
     // Log query parameters for debugging
@@ -20,10 +19,8 @@ app.get('/proxy', async (req, res) => {
     }
 
     try {
-        // Log before sending the request to yourcourts.com
         console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
 
-        // Sending request to the actual schedule page on yourcourts.com
         const response = await axios.get('https://www.yourcourts.com/facility/viewer/8353821', {
             params: {
                 reservationDate: reservationDate,
@@ -32,23 +29,26 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Log the full response data to see its structure
+        // Check if the response is HTML instead of JSON
+        if (response.headers['content-type'].includes('html')) {
+            console.log('Received HTML instead of JSON. Full response body:');
+            console.log(response.data); // Log HTML content
+            return res.status(500).json({ error: 'Received HTML content instead of expected JSON. Check for authentication or other issues.' });
+        }
+
+        // If the response contains data in JSON, continue processing
         console.log('Raw Response Data:', response.data);
 
-        // Assuming the data comes in a nested structure, inspect its contents:
-        const reservations = response.data.reservations || []; // Adjust based on actual response structure
-        
-        // If reservations is not an array, log an error
+        const reservations = response.data.reservations || [];
+
         if (!Array.isArray(reservations)) {
             console.error('Reservations is not an array:', reservations);
             return res.status(500).json({ error: 'Unexpected data format received from yourcourts.com' });
         }
 
-        // Process the data into a format we can display
         let processedSchedule = [];
 
         reservations.forEach(reservation => {
-            // If the reservation time is "Not open", skip it
             if (reservation.time === 'Not open') return;
 
             let currentUser = '';
@@ -58,7 +58,6 @@ app.get('/proxy', async (req, res) => {
                 currentUser = reservation.username === 'Open' ? 'Not currently reserved' : reservation.username;
             }
 
-            // Add to processed schedule
             processedSchedule.push({
                 time: reservation.time,
                 currentUser: currentUser,
@@ -66,10 +65,7 @@ app.get('/proxy', async (req, res) => {
             });
         });
 
-        // Log the processed schedule for debugging
         console.log('Processed Schedule:', JSON.stringify(processedSchedule));
-
-        // Send the processed schedule back to the frontend
         res.json(processedSchedule);
     } catch (error) {
         console.error('Error fetching data from yourcourts.com:', error);
