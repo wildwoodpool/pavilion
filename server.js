@@ -1,48 +1,45 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.get('/', async (req, res) => {
-    // Extract reservationDate and facility_id from the query parameters
+app.get('/proxy', async (req, res) => {
     const { reservationDate, facility_id, court_id } = req.query;
 
-    if (!reservationDate || !facility_id || !court_id) {
-        return res.status(400).send('Missing required parameters.');
+    // Log the query parameters to verify the correct IDs are being passed
+    console.log(`Reservation Date: ${reservationDate}`);
+    console.log(`Facility ID: ${facility_id}`);
+    console.log(`Court ID: ${court_id}`);
+
+    // Check that the facility_id is correct (pavilion in this case)
+    if (facility_id !== '2103') {
+        return res.status(400).json({ error: 'Invalid facility ID. Expected Pavilion ID.' });
+    }
+
+    // Check that the court_id is correct (15094 for the pavilion court)
+    if (court_id !== '15094') {
+        return res.status(400).json({ error: 'Invalid court ID. Expected Pavilion Court.' });
     }
 
     try {
-        // Log the date to verify it's correct
-        console.log('Requested Reservation Date:', reservationDate);
-
-        // Convert reservationDate into the correct format (if needed)
-        const parsedDate = new Date(reservationDate);
-        console.log('Parsed Date:', parsedDate);
-
-        // Fetch the schedule page
-        const response = await axios.get(`https://www.yourcourts.com/facility/viewer/8353821?reservationDate=${reservationDate}&facility_id=${facility_id}&court_id=${court_id}`);
-        
-        const $ = cheerio.load(response.data);
-
-        // Now parse the schedule using cheerio
-        const scheduleRows = [];
-        $('table tbody tr').each((index, row) => {
-            const time = $(row).find('td.time').text().trim();
-            const user = $(row).find('td.user').text().trim();
-
-            scheduleRows.push({ time, user });
+        // Send a request to the actual schedule page with the correct parameters
+        const response = await axios.get(`https://www.yourcourts.com/facility/viewer/8353821`, {
+            params: {
+                reservationDate: reservationDate,
+                facility_id: facility_id,
+                court_id: court_id
+            }
         });
 
-        console.log('Parsed Schedule Rows:', scheduleRows);
-
-        res.json({ currentUser: 'Not currently reserved', nextUser: 'No upcoming reservation' });
+        // Return the data from the schedule page back to the frontend
+        res.json(response.data);
     } catch (error) {
-        console.error('Error fetching or parsing schedule:', error);
-        res.status(500).send('Error fetching or parsing schedule.');
+        console.error('Error fetching target URL:', error);
+        res.status(500).json({ error: 'Failed to fetch target URL' });
     }
 });
 
+// Start the server
 app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });
