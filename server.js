@@ -36,16 +36,20 @@ app.get('/proxy', async (req, res) => {
     const groupedReservations = [];
     let currentReservation = null;
 
-    reservations.forEach((res) => {
-      if (currentReservation && currentReservation.status === res.status && dayjs(currentReservation.endTime, 'h:mma').isSame(dayjs(res.startTime, 'h:mma'))) {
-        // Extend the end time of the current reservation if it's back-to-back
-        currentReservation.endTime = res.endTime;
+    reservations.forEach((res, index) => {
+      // Check if the next reservation exists
+      const nextReservation = reservations[index + 1];
+
+      if (nextReservation && currentReservation && currentReservation.status === res.status && dayjs(currentReservation.endTime, 'h:mma').isSame(dayjs(res.startTime, 'h:mma'))) {
+        // Extend the end time of the current reservation to the next reservation's start time
+        currentReservation.endTime = nextReservation.startTime;
       } else {
         if (currentReservation) groupedReservations.push(currentReservation);
         currentReservation = { ...res };
       }
     });
 
+    // Add the last reservation
     if (currentReservation) groupedReservations.push(currentReservation);
 
     // Format as a table for output
