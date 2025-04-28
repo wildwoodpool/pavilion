@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Embed and Parse YourCourts Schedule</title>
+  <style>
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+    }
+    #scheduleStatus {
+      padding: 10px;
+      background-color: #f0f0f0;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>YourCourts Pavilion Rentals</h1>
+  
+  <!-- Embed the YourCourts page as an iframe -->
+  <iframe id="scheduleIframe" src="https://www.yourcourts.com/facility/viewer/8353821?facility_id=2103&court_id=15094"></iframe>
+
+  <!-- Display extracted schedule info -->
+  <div id="scheduleStatus">
+    <h3>Schedule Info</h3>
+    <p><strong>Current User:</strong> <span id="currentUser">Loading...</span></p>
+    <p><strong>Next User:</strong> <span id="nextUser">Loading...</span></p>
+  </div>
+
+  <script>
+    document.getElementById('scheduleIframe').onload = function() {
+      // Wait for iframe to load completely before accessing its content
+      const iframe = document.getElementById('scheduleIframe');
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+      // Function to extract the schedule data
+      function extractScheduleData() {
+        // Find the table or content that holds the schedule (you may need to inspect the page to identify it)
+        const rows = iframeDoc.querySelectorAll('.calendar_table tr');
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        let currentUser = "Room is free";
+        let nextUser = "No upcoming booking";
+
+        rows.forEach((row, index) => {
+          if (index === 0) return; // Skip header row
+          const cells = row.querySelectorAll('td');
+          if (cells.length < 2) return;
+
+          const timeStr = cells[0].innerText.trim();
+          const user = cells[1].innerText.trim();
+
+          let match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+          if (match) {
+            let hour = parseInt(match[1], 10);
+            let minute = parseInt(match[2], 10);
+            let ampm = match[3].toUpperCase();
+
+            if (ampm === 'PM' && hour !== 12) hour += 12;
+            if (ampm === 'AM' && hour === 12) hour = 0;
+
+            const minutesSinceMidnight = hour * 60 + minute;
+            if (minutesSinceMidnight <= currentMinutes) {
+              currentUser = user;
+            } else if (minutesSinceMidnight > currentMinutes && nextUser === "No upcoming booking") {
+              nextUser = user;
+            }
+          }
+        });
+
+        // Update the display with current and next user
+        document.getElementById('currentUser').textContent = currentUser;
+        document.getElementById('nextUser').textContent = nextUser;
+      }
+
+      // Run the function to extract data from the iframe
+      extractScheduleData();
+    };
+  </script>
+</body>
+</html>
