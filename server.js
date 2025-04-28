@@ -1,86 +1,68 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const app = express();
 
-// Proxy route to forward the request
-app.get('/proxy', async (req, res) => {
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.get('/check-reservation', async (req, res) => {
     const { reservationDate, facility_id, court_id } = req.query;
 
-    // Log query parameters for debugging
     console.log(`Received Query Parameters: ${JSON.stringify(req.query)}`);
-
-    // Validate facility_id and court_id to ensure we are targeting the right facility
-    if (facility_id !== '2103') {
-        return res.status(400).json({ error: 'Invalid facility ID. Expected Pavilion ID.' });
-    }
-
-    if (court_id !== '15094') {
-        return res.status(400).json({ error: 'Invalid court ID. Expected Pavilion Court.' });
-    }
-
     try {
+        // Construct the URL based on user input
+        const url = `https://www.yourcourts.com/facility/viewer/8353821?reservationDate=${reservationDate}&facility_id=${facility_id}&court_id=${court_id}`;
         console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
 
-        // Make the request to the yourcourts.com URL and retrieve the HTML response
-        const response = await axios.get('https://www.yourcourts.com/facility/viewer/8353821', {
-            params: {
-                reservationDate: reservationDate,
-                facility_id: facility_id,
-                court_id: court_id
-            }
-        });
+        // Fetch the page content
+        const response = await axios.get(url);
 
-        // Remove HTML comments from the response data
-        const cleanHtml = response.data.replace(/<!--[\s\S]*?-->/g, '');
+        // Load the HTML response into cheerio for parsing
+        const $ = cheerio.load(response.data);
 
-        // Log more of the cleaned HTML response to inspect the structure
-        console.log("Cleaned HTML response (first 20000 characters):", cleanHtml.slice(0, 20000));
-
-        // If the response contains HTML, parse it using cheerio
-        const $ = cheerio.load(cleanHtml);
-
-        // Initialize an empty array for reservations
+        // Initialize an array to store the reservations
         let reservations = [];
 
-        // Update this selector based on where the reservation data is located in the HTML
-        // Example: Finding a table or reservation rows (adjust based on actual page structure)
-        $('table.reservation-table tr').each((index, element) => {
-            const time = $(element).find('.time').text().trim();
-            const username = $(element).find('.username').text().trim();
-            const nextUser = $(element).find('.next-user').text().trim();
+        // Loop through each table row that contains court time info
+        $('tr').each((i, row) => {
+            const time = $(row).find('.court-time').text().trim(); // Extract the time (e.g., '10:30AM')
 
-            // Process each reservation (you may need to tweak this)
-            if (time !== 'Not open') {
-                let currentUser = '';
+            // Skip rows without time or with irrelevant data
+            if (!time) return;
 
-                if (time === 'Not available for rental' || time === 'Open') {
-                    currentUser = 'Not currently reserved';
-                } else if (['Setup time', 'Takedown time', 'Setup and takedown time'].includes(time)) {
-                    currentUser = username === 'Open' ? 'Not currently reserved' : username;
-                }
+            const availabilityText = $(row).find('td').last().text().trim(); // Get the availability text
 
+            // Check if the court is reserved or not
+            if (availabilityText && availabilityText.toLowerCase().includes('not available')) {
                 reservations.push({
-                    time: time,
-                    currentUser: currentUser,
-                    nextUser: nextUser || 'No upcoming reservation'
+                    time,
+                    status: 'Not available',
+                });
+            } else if (availabilityText && availabilityText.toLowerCase().includes('setup time')) {
+                reservations.push({
+                    time,
+                    status: 'Setup time',
+                });
+            } else {
+                reservations.push({
+                    time,
+                    status: 'Available for rental', // If no specific status is found, assume it's available
                 });
             }
         });
 
-        console.log('Processed Reservations:', JSON.stringify(reservations));
-
-        // Return the processed data as JSON
-        res.json(reservations);
-
+        // Return the processed reservation data
+        res.json({ reservations });
     } catch (error) {
-        console.error('Error fetching data from yourcourts.com:', error);
-        res.status(500).json({ error: 'Failed to fetch or parse data from yourcourts.com' });
+        console.error("Error fetching data from yourcourts.com:", error);
+        res.status(500).json({ error: "Failed to fetch data" });
     }
 });
 
-// Start the server on the appropriate port
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Start the server
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
 });
