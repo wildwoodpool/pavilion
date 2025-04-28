@@ -21,13 +21,21 @@ app.get('/proxy', async (req, res) => {
     console.log(`Fetching data from ${url}`);
     
     const response = await axios.get(url);
-    const $ = cheerio.load(response.data);  // Load the HTML data into cheerio
+    const $ = cheerio.load(response.data);
 
-    // Extract the required table rows
+    // Instead of raw HTML, let's print pretty/formatted specific sections
+    const mainContent = $('body').html();  // get the body part
+    const prettyMainContent = $.html($('body'));  // Cheerio will format it nicely
+    console.log('Formatted HTML <body> Content (first 2000 chars):');
+    console.log(prettyMainContent.substring(0, 2000));  // limit to avoid blowing up logs
+
+    // Extract reservations
     const reservations = [];
     $('tr').each((index, element) => {
       const time = $(element).find('.court-time').text().trim();
       const status = $(element).find('td').last().text().trim();
+      console.log(`Row ${index}: Time = ${time}, Status = ${status}`);
+      
       if (time && status) {
         reservations.push({ time, status });
       }
@@ -40,7 +48,7 @@ app.get('/proxy', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Error fetching data from yourcourts.com:', error);
+    console.error('Error fetching data from yourcourts.com:', error.message);
     return res.status(500).json({ error: 'Failed to fetch data from yourcourts.com' });
   }
 });
