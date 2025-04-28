@@ -38,9 +38,13 @@ app.get('/proxy', async (req, res) => {
             const timeCell = $(cells[0]).text().trim(); // Assuming first cell is the time
             const userCell = $(cells[1]).text().trim(); // Assuming second cell is the user
             
-            // Convert the time in the table to a Date object
+            console.log(`Row ${index + 1}: Time - ${timeCell}, User - ${userCell}`); // Debugging log
+
+            // Convert the time in the table to a Date object (adjust format)
             const scheduleTime = new Date(`1970-01-01T${timeCell}:00Z`); // Adjust as necessary
-            
+
+            console.log(`Parsed schedule time: ${scheduleTime}`); // Debugging log
+
             if (scheduleTime <= currentTime && !currentUser) {
                 currentUser = userCell; // The first user that matches or is before the current time
             } else if (scheduleTime > currentTime && !nextUser) {
