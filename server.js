@@ -5,61 +5,57 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.get('/proxy', async (req, res) => {
-  try {
     const { reservationDate, facility_id, court_id } = req.query;
-
-    if (!reservationDate || !facility_id || !court_id) {
-      return res.status(400).json({ error: 'Missing required query parameters.' });
-    }
-
     console.log('Received Query Parameters:', { reservationDate, facility_id, court_id });
 
-    const url = `https://www.yourcourts.com/facility/viewer/${facility_id}?reservationDate=${reservationDate}&court_id=${court_id}`;
-    console.log('Fetching data from', url);
+    try {
+        // Correct URL structure
+        const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
+        console.log(`Fetching data from ${url}`);
 
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.yourcourts.com/',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-      }
-    });
+        const response = await axios.get(url);
+        const html = response.data;
 
-    const html = response.data;
-    const $ = cheerio.load(html);
+        // Load the HTML into Cheerio
+        const $ = cheerio.load(html);
 
-    // Just for debugging: show some cleaned, readable HTML
-    const bodyHtml = $('body').html() || '';
-    console.log('Formatted HTML <body> Content (first 2000 chars):\n', bodyHtml.substring(0, 2000));
+        // Log a formatted snippet of <body> content (first 2000 characters)
+        const bodyHtml = $('body').html()?.replace(/<!--[\s\S]*?-->/g, '') || '';
+        console.log('Formatted HTML <body> Content (first 2000 chars):');
+        console.log(bodyHtml.slice(0, 2000));
 
-    const reservations = [];
+        const reservations = [];
 
-    $('tr').each((_, element) => {
-      const time = $(element).find('td.court-time').text().trim();
-      const courtStatus = $(element).find('td[align="center"]').text().trim();
+        // Scrape time slots and their statuses
+        $('tr[id]').each((_, tr) => {
+            const time = $(tr).find('td.court-time').text().trim();
+            const statusCell = $(tr).find('td').not('.court-time').first();
+            const statusText = statusCell.text().trim();
+            const statusColor = statusCell.css('background-color');
 
-      if (time) {
-        reservations.push({
-          time,
-          status: courtStatus || 'Unknown'
+            if (time && statusText) {
+                reservations.push({
+                    time,
+                    status: statusText,
+                    color: statusColor
+                });
+            }
         });
-      }
-    });
 
-    if (reservations.length === 0) {
-      res.json({ message: 'No reservations found for this date and court.' });
-    } else {
-      console.log('Processed Reservations:', reservations);
-      res.json(reservations);
+        if (reservations.length > 0) {
+            console.log('Processed Reservations:', reservations);
+            res.json(reservations);
+        } else {
+            console.log('No reservations found.');
+            res.json({ message: 'No reservations found for this date and court.' });
+        }
+
+    } catch (error) {
+        console.error('Error fetching or processing data:', error.message);
+        res.status(500).json({ error: 'Failed to fetch or process reservation data.' });
     }
-
-  } catch (error) {
-    console.error('Error fetching or processing reservations:', error.message);
-    res.status(500).json({ error: 'Failed to fetch reservations.' });
-  }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
