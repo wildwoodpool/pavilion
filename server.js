@@ -1,97 +1,64 @@
-const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const dayjs = require('dayjs');
-const { DateTime } = require('luxon');
-const fetch = require('node-fetch');
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-// Function to fetch reservation data
-const fetchReservationData = async (reservationDate, facility_id, court_id) => {
+app.use(cors());
+
+app.get('/proxy', async (req, res) => {
+  const { reservationDate, facility_id, court_id } = req.query;
+
   try {
-    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
-    const response = await fetch(url);
-    const body = await response.text();
-    const $ = cheerio.load(body);
+    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate || dayjs().format('M/D/YYYY')}&court_id=${court_id}`;
+    const { data } = await axios.get(url);
 
-    // Assuming the table with the reservations has specific rows with the relevant data
+    const $ = cheerio.load(data);
     const reservations = [];
-    
-    $('tr').each((index, element) => {
-      const startTime = $(element).find('.start-time-selector').text().trim(); // Adjust the selector based on actual HTML structure
-      const status = $(element).find('.status-selector').text().trim(); // Adjust the selector based on actual HTML structure
-      const endTime = $(element).find('.end-time-selector').text().trim(); // Adjust the selector based on actual HTML structure
 
-      if (startTime && status && endTime) {
-        reservations.push({
-          startTime,
-          status,
-          endTime
-        });
+    // Parsing the reservation times
+    $('tr').each((i, row) => {
+      const startTime = $(row).find('.court-time').text().trim();
+      const status = $(row).find('td').last().text().trim();
+
+      // Skip rows with no relevant data
+      if (!startTime || status === 'Open' || status.includes('Setup') || status.includes('Takedown')) return;
+
+      const endTime = $(row).next().find('.court-time').text().trim() || startTime;
+
+      reservations.push({ startTime, status, endTime });
+    });
+
+    // Now group back-to-back events with the same text into one reservation
+    const groupedReservations = [];
+    let currentReservation = null;
+
+    reservations.forEach((res) => {
+      if (currentReservation && currentReservation.status === res.status && dayjs(currentReservation.endTime, 'h:mma').isSame(dayjs(res.startTime, 'h:mma'))) {
+        // Extend the end time of the current reservation if it's back-to-back
+        currentReservation.endTime = res.endTime;
+      } else {
+        if (currentReservation) groupedReservations.push(currentReservation);
+        currentReservation = { ...res };
       }
     });
 
-    return reservations;
+    if (currentReservation) groupedReservations.push(currentReservation);
+
+    // Format as a table for output
+    console.table(groupedReservations);
+
+    res.json(groupedReservations);
+
   } catch (error) {
     console.error('Error fetching data from yourcourts.com:', error);
-    return [];
+    res.status(500).json({ message: 'Error fetching reservation data' });
   }
-};
-
-// Function to format the reservations, ignoring empty ones and applying all the rules
-const formatReservations = (reservations) => {
-  let formattedReservations = [];
-  let currentReservation = null;
-
-  for (let i = 0; i < reservations.length; i++) {
-    const { startTime, status, endTime } = reservations[i];
-
-    // Skip empty events
-    if (status === 'Open' || status.includes('Setup and takedown time') || status === 'Not available for rental') {
-      continue;
-    }
-
-    // Handle merging of back-to-back reservations
-    if (currentReservation && currentReservation.status === status) {
-      currentReservation.endTime = endTime;
-    } else {
-      if (currentReservation) {
-        formattedReservations.push(currentReservation);
-      }
-      currentReservation = { startTime, status, endTime };
-    }
-  }
-
-  // Add the last reservation if present
-  if (currentReservation) {
-    formattedReservations.push(currentReservation);
-  }
-
-  return formattedReservations;
-};
-
-// API to fetch and process reservation data
-app.get('/proxy', async (req, res) => {
-  const reservationDate = req.query.reservationDate || dayjs().format('MM/DD/YYYY'); // Default to today
-  const facility_id = req.query.facility_id;
-  const court_id = req.query.court_id;
-
-  if (!facility_id || !court_id) {
-    return res.status(400).json({ error: 'Facility ID and Court ID are required' });
-  }
-
-  const reservations = await fetchReservationData(reservationDate, facility_id, court_id);
-  const formattedReservations = formatReservations(reservations);
-
-  // Log the reservations as a table
-  console.table(formattedReservations);
-
-  // Send the formatted reservations as JSON response
-  res.json(formattedReservations);
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
