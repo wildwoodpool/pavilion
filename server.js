@@ -40,7 +40,7 @@ app.get('/proxy', async (req, res) => {
         // If the response contains HTML, parse it using cheerio
         const $ = cheerio.load(cleanHtml);
 
-        // You need to adjust this based on the structure of the HTML page
+        // Initialize an empty array for reservations
         let reservations = [];
 
         // For the sake of the example, assuming reservation data is inside a table
@@ -72,3 +72,15 @@ app.get('/proxy', async (req, res) => {
 
         // Return the processed data as JSON
         res.json(reservations);
+
+    } catch (error) {
+        console.error('Error fetching data from yourcourts.com:', error);
+        res.status(500).json({ error: 'Failed to fetch or parse data from yourcourts.com' });
+    }
+});
+
+// Start the server on the appropriate port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
