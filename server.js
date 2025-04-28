@@ -2,106 +2,83 @@ const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const moment = require('moment-timezone');
-
 const app = express();
+const port = process.env.PORT || 3000;
 
-// Endpoint to fetch reservations data
+// Define the time zone for Eastern Time (adjusted for daylight saving time)
+const timeZone = 'America/New_York';
+
 app.get('/proxy', async (req, res) => {
+  try {
     const { reservationDate, facility_id, court_id } = req.query;
+    
+    // Fetch the page from yourcourts.com
+    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
+    console.log(`Fetching data from: ${url}`);
+    
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
 
-    try {
-        const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
-        console.log(`Fetching data from ${url}`);
+    // Array to store the reservation data
+    let reservations = [];
 
-        const response = await axios.get(url);
+    // Process the reservation rows from the HTML
+    $('tr').each((index, element) => {
+      const time = $(element).find('td.court-time').text().trim();
+      const status = $(element).find('td').last().text().trim();
 
-        // Parse the HTML response
-        const reservations = processReservations(response.data);
+      // Ignore irrelevant statuses and empty rows
+      if (!time || !status || status.includes('Setup and takedown time') || status === 'Open') return;
 
-        if (reservations.length === 0) {
-            res.json({ message: "No reservations today." });
-        } else {
-            console.table(reservations);
-            res.json(reservations);
-        }
-    } catch (error) {
-        console.error('Error fetching data from yourcourts.com:', error);
-        res.status(500).json({ error: 'Failed to fetch data from yourcourts.com' });
-    }
+      // Remove "Member Event" from the status
+      const cleanStatus = status.replace('Member Event', '').trim();
+
+      // Push the reservation into the array
+      reservations.push({ time, status: cleanStatus });
+    });
+
+    // Format reservations and group back-to-back entries
+    const formattedReservations = formatReservations(reservations);
+    
+    // Send formatted data as a table
+    res.json({
+      reservations: formattedReservations
+    });
+
+  } catch (error) {
+    console.error('Error fetching data from yourcourts.com:', error.message);
+    res.status(500).json({ message: 'Error fetching reservation data.' });
+  }
 });
 
-// Process the reservations and return a list of reservations
-function processReservations(html) {
-    const $ = cheerio.load(html);
-    const reservations = [];
-    let currentReservation = null;
+// Function to group back-to-back reservations and ensure correct times
+function formatReservations(reservations) {
+  let formatted = [];
+  let currentGroup = null;
 
-    // Get the current time in Eastern Time (adjusted for DST)
-    const currentTime = moment().tz('America/New_York');
+  reservations.forEach((reservation, index) => {
+    if (currentGroup) {
+      if (reservation.status === currentGroup.status) {
+        // If the status is the same, extend the end time
+        currentGroup.endTime = reservation.time; // Update end time to latest time
+      } else {
+        // Push the current group and start a new one
+        formatted.push(currentGroup);
+        currentGroup = { startTime: reservation.time, status: reservation.status, endTime: reservation.time };
+      }
+    } else {
+      currentGroup = { startTime: reservation.time, status: reservation.status, endTime: reservation.time };
+    }
 
-    // Parse all reservation times and statuses
-    $('tr').each((index, element) => {
-        const time = $(element).find('td.court-time').text().trim();
-        const status = $(element).find('td').last().text().trim();
+    // If this is the last reservation, push the group
+    if (index === reservations.length - 1) {
+      formatted.push(currentGroup);
+    }
+  });
 
-        if (time && status) {
-            // Clean status: remove "Member Event" or other irrelevant text
-            let cleanStatus = status.includes('Member Event') 
-                ? status.replace('Member Event', '').trim() 
-                : status;
-
-            // Filter out "Not available for rental" and other unavailable statuses
-            if (cleanStatus !== 'Not available for rental' && cleanStatus !== 'Not open') {
-                // Convert reservation time to moment object in Eastern Time
-                const reservationTime = moment.tz(`${time} ${currentTime.format('YYYY-MM-DD')}`, 'h:mma', 'America/New_York');
-
-                // Add the reservation to the list if it's after the current time
-                if (reservationTime.isAfter(currentTime)) {
-                    currentReservation = {
-                        startTime: reservationTime.format('h:mma'),
-                        status: cleanStatus,
-                    };
-                    reservations.push(currentReservation);
-                }
-            }
-        }
-    });
-
-    // Group back-to-back reservations with the same status into a single reservation
-    const groupedReservations = groupBackToBackReservations(reservations);
-
-    return groupedReservations;
+  return formatted;
 }
 
-// Helper function to group back-to-back reservations with the same status
-function groupBackToBackReservations(reservations) {
-    const grouped = [];
-    let lastReservation = null;
-
-    reservations.forEach(reservation => {
-        if (lastReservation && lastReservation.status === reservation.status) {
-            // If status is the same, merge reservations by combining the times
-            lastReservation.endTime = reservation.startTime; // Update end time
-        } else {
-            // Otherwise, add the current reservation to the grouped list
-            reservation.endTime = reservation.startTime; // Set end time to start time if it's a single reservation
-            grouped.push(reservation);
-            lastReservation = reservation;
-        }
-    });
-
-    // Set the end times for merged reservations
-    grouped.forEach((reservation, index) => {
-        if (index < grouped.length - 1 && reservation.status === grouped[index + 1].status) {
-            reservation.endTime = grouped[index + 1].startTime;
-        }
-    });
-
-    return grouped;
-}
-
-// Start the server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
