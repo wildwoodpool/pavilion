@@ -24,7 +24,7 @@ app.get('/proxy', async (req, res) => {
       const startTime = $(row).find('.court-time').text().trim();
       const status = $(row).find('td').last().text().trim();
 
-      // Skip rows where startTime equals status
+      // Skip rows where startTime equals status, "Open", or contains Setup or Takedown
       if (!startTime || status === startTime || status === 'Open' || status.includes('Setup') || status.includes('Takedown')) return;
 
       // Add the reservation if it's valid
@@ -53,10 +53,25 @@ app.get('/proxy', async (req, res) => {
     // Add the last reservation
     if (currentReservation) groupedReservations.push(currentReservation);
 
-    // Format as a table for output
-    console.table(groupedReservations);
+    // Now check for empty slots (start time == status) between two identical status events
+    const finalReservations = [];
+    for (let i = 0; i < groupedReservations.length; i++) {
+      const curr = groupedReservations[i];
+      const next = groupedReservations[i + 1];
 
-    res.json(groupedReservations);
+      // If there's a gap between two identical events, merge them
+      if (next && curr.status === next.status && !dayjs(curr.endTime, 'h:mma').isBefore(dayjs(next.startTime, 'h:mma'))) {
+        curr.endTime = next.endTime;
+        continue;  // Skip the next reservation because it’s merged into the current one
+      }
+
+      finalReservations.push(curr);
+    }
+
+    // Format as a table for output
+    console.table(finalReservations);
+
+    res.json(finalReservations);
 
   } catch (error) {
     console.error('Error fetching data from yourcourts.com:', error);
