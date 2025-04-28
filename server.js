@@ -1,98 +1,87 @@
-const express = require('express');
-const axios = require('axios');
-const cheerio = require('cheerio');
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
-const timezone = require('dayjs/plugin/timezone');
-const advancedFormat = require('dayjs/plugin/advancedFormat');
+import express from 'express';
+import axios from 'axios';
+import cheerio from 'cheerio';
+import cors from 'cors';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone.js';
+import utc from 'dayjs/plugin/utc.js';
+
+const app = express();
+const port = process.env.PORT || 3000;
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-dayjs.extend(advancedFormat);
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+app.use(cors());
 
-// Your configuration
-const facility_id = '2103'; // Replace with your real facility ID
-const court_id = '15094';   // Replace with your real court ID
-
-// Helper to fix "Member Event"
-function cleanStatus(status) {
-    return status.replace(/\bMember Event\b/g, '').trim();
-}
-
-// Helper to check if status is just a time
-function isTimeOnly(status) {
-    return /^([1-9]|1[0-2]):[0-5][0-9](AM|PM)$/i.test(status.trim());
-}
-
-// Fetch reservation data
-async function fetchReservations() {
-    const today = dayjs().tz('America/New_York').format('M/D/YYYY');
-    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}?reservationDate=${today}&court_id=${court_id}`;
-
-    try {
-        console.log(`Fetching data from ${url}`);
-        const response = await axios.get(url);
-        const $ = cheerio.load(response.data);
-
-        const times = [];
-        $('.court-time').each((i, elem) => {
-            times.push($(elem).text().trim());
-        });
-
-        const statuses = [];
-        $('td[class*="court-closed"], td[class*="court-open"], td[class*="court-reserved"]').each((i, elem) => {
-            let text = $(elem).text().replace(/\s+/g, ' ').trim();
-            text = cleanStatus(text);
-            statuses.push(text);
-        });
-
-        if (times.length === 0 || statuses.length === 0) {
-            return { message: "No reservations today." };
-        }
-
-        // Build initial raw reservations
-        const rawReservations = times.map((time, index) => ({
-            startTime: time,
-            status: statuses[index] || '',
-        }));
-
-        // Assign endTimes based on the next event
-        for (let i = 0; i < rawReservations.length - 1; i++) {
-            rawReservations[i].endTime = rawReservations[i + 1].startTime;
-        }
-        rawReservations[rawReservations.length - 1].endTime = "End of Day";
-
-        // Now filter out:
-        // - reservations that are empty or just times
-        // - "Setup time", "Takedown time", "Open"
-        const filteredReservations = rawReservations.filter(res => {
-            const ignoreStatuses = ['Setup time', 'Setup and takedown time', 'Takedown time', 'Open'];
-            return (
-                !isTimeOnly(res.status) &&
-                !ignoreStatuses.includes(res.status)
-            );
-        });
-
-        console.table(filteredReservations, ['startTime', 'status', 'endTime']);
-
-        return { reservations: filteredReservations };
-
-    } catch (error) {
-        console.error('Error fetching data from yourcourts.com:', error);
-        return { message: 'Error fetching reservation data.' };
-    }
-}
-
-// Main endpoint
 app.get('/proxy', async (req, res) => {
-    const reservations = await fetchReservations();
-    res.json(reservations);
+  try {
+    let { reservationDate, facility_id, court_id } = req.query;
+
+    if (!facility_id || !court_id) {
+      return res.status(400).json({ message: 'Missing facility_id or court_id' });
+    }
+
+    if (!reservationDate) {
+      reservationDate = dayjs().tz('America/New_York').format('M/D/YYYY');
+    }
+
+    const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}?reservationDate=${reservationDate}&court_id=${court_id}`;
+
+    console.log(`Fetching data from ${url}`);
+
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+
+    const rows = $('td.reservation-grid-cell');
+    let reservations = [];
+
+    rows.each((index, element) => {
+      const time = $(element).attr('data-time')?.trim();
+      let status = $(element).text().trim();
+
+      if (time && status) {
+        // If status includes "Member Event", remove it
+        status = status.replace('Member Event', '').trim();
+
+        reservations.push({
+          startTime: time,
+          status,
+        });
+      }
+    });
+
+    // Set endTimes based on the next startTime
+    for (let i = 0; i < reservations.length; i++) {
+      reservations[i].endTime = reservations[i + 1]?.startTime || reservations[i].startTime;
+    }
+
+    // Now filter out "empty" events where the status is just a time (like '4:00PM')
+    const filteredReservations = reservations.filter(r => {
+      return !(r.status.match(/^\d{1,2}:\d{2}(AM|PM)$/i));
+    });
+
+    // Further filter out unwanted statuses
+    const ignoredStatuses = [
+      'Setup time',
+      'Setup and takedown time',
+      'Takedown time',
+      'Open',
+      'Not available for rental'
+    ];
+
+    const finalReservations = filteredReservations.filter(r => !ignoredStatuses.includes(r.status));
+
+    console.table(finalReservations);
+
+    res.json({ reservations: finalReservations });
+
+  } catch (error) {
+    console.error('Error fetching data from yourcourts.com:', error);
+    res.status(500).json({ message: 'Error fetching reservation data.' });
+  }
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
 });
