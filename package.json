@@ -17,5 +17,8 @@
     "url": "https://github.com/wildwoodpool/pavilion/issues"
   },
   "homepage": "https://github.com/wildwoodpool/pavilion#readme",
-  "description": ""
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0"
+  }
 }
