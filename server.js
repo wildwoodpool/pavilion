@@ -56,21 +56,18 @@ function processReservations(html) {
         const status = $(element).find('td').last().text().trim();
 
         if (time && status) {
-            if (status.includes('Member Event')) {
-                // Remove "Member Event" but keep the name
-                const statusWithoutMemberEvent = status.replace('Member Event', '').trim();
-                currentReservation = {
-                    time,
-                    status: statusWithoutMemberEvent,
-                };
-            } else {
-                currentReservation = {
-                    time,
-                    status,
-                };
-            }
+            // Remove "Member Event" and other unnecessary text
+            const cleanStatus = status.includes('Member Event') 
+                ? status.replace('Member Event', '').trim() 
+                : status;
 
-            reservations.push(currentReservation);
+            if (time && cleanStatus) {
+                currentReservation = {
+                    time,
+                    status: cleanStatus,
+                };
+                reservations.push(currentReservation);
+            }
         }
     });
 
@@ -91,13 +88,13 @@ function groupBackToBackReservations(reservations) {
             currentGroup = reservation;
         } else {
             // If reservation times are consecutive (e.g., 10:00AM - 10:30AM), we group them together
-            const lastTime = currentGroup.time.split('-')[1].trim();
-            const newTime = reservationTime.split('-')[0].trim();
+            const lastTime = currentGroup.time.split('-')[1]?.trim();
+            const newTime = reservationTime.split('-')[0]?.trim();
 
-            if (lastTime === newTime) {
+            if (lastTime && newTime && lastTime === newTime) {
                 currentGroup.time = `${currentGroup.time.split('-')[0]} - ${reservationTime.split('-')[1]}`;
                 // Update the end time for the group
-                currentGroup.endTime = reservationTime.split('-')[1].trim();
+                currentGroup.endTime = reservationTime.split('-')[1]?.trim();
             } else {
                 grouped.push(currentGroup);
                 currentGroup = reservation;
