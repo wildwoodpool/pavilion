@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fetch Test - ThingProxy</title>
+</head>
+<body>
+  <h1>Fetch Test with ThingProxy</h1>
+  <button id="testFetch">Test Fetch</button>
+  <pre id="output" style="white-space: pre-wrap; background: #eee; padding: 10px;"></pre>
+
+  <script>
+    document.getElementById('testFetch').addEventListener('click', async () => {
+      const proxyURL = 'https://thingproxy.freeboard.io/fetch/';
+      const targetURL = 'https://www.yourcourts.com/facility/viewer/8353821?facility_id=2103&court_id=15094';
+      
+      try {
+        const response = await fetch(proxyURL + encodeURIComponent(targetURL));
+        const text = await response.text();
+        
+        document.getElementById('output').textContent = text.slice(0, 500) + "\n\n... [truncated]";
+        console.log('Fetch successful!', text);
+      } catch (error) {
+        document.getElementById('output').textContent = 'Fetch failed: ' + error;
+        console.error('Fetch error:', error);
+      }
+    });
+  </script>
+</body>
+</html>
