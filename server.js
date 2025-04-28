@@ -1,4 +1,4 @@
-// FINAL server.js
+// FINAL FIXED server.js
 
 const express = require('express');
 const cors = require('cors');
@@ -28,14 +28,15 @@ app.get('/proxy', async (req, res) => {
 
     const rawReservations = [];
 
-    // Extract times and statuses
-    $('.calendar_holder .calendar_cell').each((_, el) => {
-      const timeText = $(el).find('.time').text().trim();
-      const reservationText = $(el).find('.reservation').text().trim();
+    // Correctly scrape each table row for time and reservation text
+    $('tr').each((_, el) => {
+      const timeText = $(el).find('td.court-time').text().trim();
+      const statusText = $(el).find('td').eq(1).text().trim();
+
       if (timeText) {
         rawReservations.push({
           startTime: formatTime(timeText),
-          status: reservationText || timeText // fallback if no reservation text
+          status: statusText || timeText
         });
       }
     });
@@ -43,7 +44,7 @@ app.get('/proxy', async (req, res) => {
     // Step 1: Remove placeholders (status = startTime)
     const filtered = rawReservations.filter(r => r.status !== r.startTime);
 
-    // Step 2: Merge identical events
+    // Step 2: Merge identical events across placeholders
     const merged = [];
     let i = 0;
     while (i < filtered.length) {
@@ -67,6 +68,11 @@ app.get('/proxy', async (req, res) => {
       status: cleanStatus(r.status)
     })).filter(r => r.status && !ignoreStatuses.includes(r.status));
 
+    // Step 4: Adjust end times
+    for (let k = 0; k < cleaned.length - 1; k++) {
+      cleaned[k].endTime = cleaned[k + 1].startTime;
+    }
+
     console.table(cleaned);
 
     res.json({ reservations: cleaned });
@@ -78,7 +84,7 @@ app.get('/proxy', async (req, res) => {
 });
 
 function formatTime(timeStr) {
-  return dayjs(timeStr, ['h:mmA', 'h:mm a']).format('h:mmA');
+  return dayjs(timeStr, ['h:mmA', 'h:mm a', 'h:mma', 'h:mma']).format('h:mmA');
 }
 
 function cleanStatus(status) {
