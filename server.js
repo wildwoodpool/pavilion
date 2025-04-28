@@ -1,29 +1,27 @@
 const express = require('express');
 const axios = require('axios');
 const app = express();
-const port = process.env.PORT || 3000;
 
+// Proxy route to forward the request
 app.get('/proxy', async (req, res) => {
+    // Extract parameters from query string
     const { reservationDate, facility_id, court_id } = req.query;
 
-    // Log the query parameters to verify the correct IDs are being passed
-    console.log(`Reservation Date: ${reservationDate}`);
-    console.log(`Facility ID: ${facility_id}`);
-    console.log(`Court ID: ${court_id}`);
+    // Log query parameters for debugging
+    console.log(`Received Query Parameters: ${JSON.stringify(req.query)}`);
 
-    // Check that the facility_id is correct (pavilion in this case)
+    // Validate facility_id and court_id to ensure we are targeting the right facility
     if (facility_id !== '2103') {
         return res.status(400).json({ error: 'Invalid facility ID. Expected Pavilion ID.' });
     }
 
-    // Check that the court_id is correct (15094 for the pavilion court)
     if (court_id !== '15094') {
         return res.status(400).json({ error: 'Invalid court ID. Expected Pavilion Court.' });
     }
 
     try {
-        // Send a request to the actual schedule page with the correct parameters
-        const response = await axios.get(`https://www.yourcourts.com/facility/viewer/8353821`, {
+        // Sending request to the actual schedule page on yourcourts.com
+        const response = await axios.get('https://www.yourcourts.com/facility/viewer/8353821', {
             params: {
                 reservationDate: reservationDate,
                 facility_id: facility_id,
@@ -31,15 +29,16 @@ app.get('/proxy', async (req, res) => {
             }
         });
 
-        // Return the data from the schedule page back to the frontend
+        // Send the retrieved data back to the frontend
         res.json(response.data);
     } catch (error) {
-        console.error('Error fetching target URL:', error);
+        console.error('Error fetching data from yourcourts.com:', error);
         res.status(500).json({ error: 'Failed to fetch target URL' });
     }
 });
 
-// Start the server
-app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+// Start the server on the appropriate port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
