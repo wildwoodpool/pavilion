@@ -1,72 +1,68 @@
 const express = require('express');
 const axios = require('axios');
 const cheerio = require('cheerio');
-const app = express();
-const port = process.env.PORT || 3000;
+const moment = require('moment-timezone');
 
+const app = express();
+
+// Endpoint to fetch reservations data
 app.get('/proxy', async (req, res) => {
     const { reservationDate, facility_id, court_id } = req.query;
 
-    console.log(`Received Query Parameters: ${JSON.stringify(req.query)}`);
-    console.log(`Making request to yourcourts.com with reservationDate: ${reservationDate}, facility_id: ${facility_id}, court_id: ${court_id}`);
-
     try {
         const url = `https://www.yourcourts.com/facility/viewer/8353821?facility_id=${facility_id}&reservationDate=${reservationDate}&court_id=${court_id}`;
+        console.log(`Fetching data from ${url}`);
+
         const response = await axios.get(url);
-        const html = response.data;
 
-        console.log("Formatted HTML <body> Content (first 2000 chars):");
-        console.log(html.substring(0, 2000)); // To avoid logging huge HTML data
-
-        const reservations = processReservations(html);
+        // Parse the HTML response
+        const reservations = processReservations(response.data);
 
         if (reservations.length === 0) {
-            return res.json({ message: "No reservations today." });
+            res.json({ message: "No reservations today." });
+        } else {
+            console.table(reservations);
+            res.json(reservations);
         }
-
-        const currentUser = reservations[0];
-        const nextUser = reservations.length > 1 ? reservations[1] : { message: "No more reservations today." };
-
-        const formattedReservations = {
-            currentUser: {
-                time: currentUser.time,
-                status: currentUser.status,
-            },
-            nextUser: {
-                time: nextUser.time || '',
-                status: nextUser.status || '',
-            },
-        };
-
-        console.log("Processed Reservations:", formattedReservations);
-        return res.json(formattedReservations);
     } catch (error) {
-        console.error("Error fetching data from yourcourts.com:", error);
-        return res.status(500).json({ error: 'Error fetching data from yourcourts.com' });
+        console.error('Error fetching data from yourcourts.com:', error);
+        res.status(500).json({ error: 'Failed to fetch data from yourcourts.com' });
     }
 });
 
+// Process the reservations and return a list of reservations
 function processReservations(html) {
     const $ = cheerio.load(html);
     const reservations = [];
     let currentReservation = null;
 
+    // Get the current time in Eastern Time (adjusted for DST)
+    const currentTime = moment().tz('America/New_York');
+
+    // Parse all reservation times and statuses
     $('tr').each((index, element) => {
         const time = $(element).find('td.court-time').text().trim();
         const status = $(element).find('td').last().text().trim();
 
         if (time && status) {
-            // Remove "Member Event" and other unnecessary text
-            const cleanStatus = status.includes('Member Event') 
+            // Clean status: remove "Member Event" or other irrelevant text
+            let cleanStatus = status.includes('Member Event') 
                 ? status.replace('Member Event', '').trim() 
                 : status;
 
-            if (time && cleanStatus) {
-                currentReservation = {
-                    time,
-                    status: cleanStatus,
-                };
-                reservations.push(currentReservation);
+            // Filter out "Not available for rental" and other unavailable statuses
+            if (cleanStatus !== 'Not available for rental' && cleanStatus !== 'Not open') {
+                // Convert reservation time to moment object in Eastern Time
+                const reservationTime = moment.tz(`${time} ${currentTime.format('YYYY-MM-DD')}`, 'h:mma', 'America/New_York');
+
+                // Add the reservation to the list if it's after the current time
+                if (reservationTime.isAfter(currentTime)) {
+                    currentReservation = {
+                        startTime: reservationTime.format('h:mma'),
+                        status: cleanStatus,
+                    };
+                    reservations.push(currentReservation);
+                }
             }
         }
     });
@@ -77,38 +73,35 @@ function processReservations(html) {
     return groupedReservations;
 }
 
+// Helper function to group back-to-back reservations with the same status
 function groupBackToBackReservations(reservations) {
     const grouped = [];
-    let currentGroup = null;
+    let lastReservation = null;
 
-    reservations.forEach((reservation, index) => {
-        const reservationTime = reservation.time;
-        
-        if (currentGroup === null) {
-            currentGroup = reservation;
+    reservations.forEach(reservation => {
+        if (lastReservation && lastReservation.status === reservation.status) {
+            // If status is the same, merge reservations by combining the times
+            lastReservation.endTime = reservation.startTime; // Update end time
         } else {
-            // If reservation times are consecutive (e.g., 10:00AM - 10:30AM), we group them together
-            const lastTime = currentGroup.time.split('-')[1]?.trim();
-            const newTime = reservationTime.split('-')[0]?.trim();
-
-            if (lastTime && newTime && lastTime === newTime) {
-                currentGroup.time = `${currentGroup.time.split('-')[0]} - ${reservationTime.split('-')[1]}`;
-                // Update the end time for the group
-                currentGroup.endTime = reservationTime.split('-')[1]?.trim();
-            } else {
-                grouped.push(currentGroup);
-                currentGroup = reservation;
-            }
+            // Otherwise, add the current reservation to the grouped list
+            reservation.endTime = reservation.startTime; // Set end time to start time if it's a single reservation
+            grouped.push(reservation);
+            lastReservation = reservation;
         }
     });
 
-    if (currentGroup !== null) {
-        grouped.push(currentGroup);
-    }
+    // Set the end times for merged reservations
+    grouped.forEach((reservation, index) => {
+        if (index < grouped.length - 1 && reservation.status === grouped[index + 1].status) {
+            reservation.endTime = grouped[index + 1].startTime;
+        }
+    });
 
     return grouped;
 }
 
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });

@@ -24,6 +24,7 @@
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "luxon": "^3.6.1",
+    "moment-timezone": "^0.5.48",
     "node-fetch": "^2.7.0"
   }
 }
