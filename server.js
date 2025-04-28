@@ -1,9 +1,9 @@
-import express from 'express';
-import axios from 'axios';
-import cheerio from 'cheerio';
-import dayjs from 'dayjs';
-import { DateTime } from 'luxon';
-import fetch from 'node-fetch';
+const express = require('express');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const dayjs = require('dayjs');
+const { DateTime } = require('luxon');
+const fetch = require('node-fetch');
 
 const app = express();
 const port = process.env.PORT || 3000;
