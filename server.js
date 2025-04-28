@@ -1,90 +1,48 @@
 const express = require('express');
 const axios = require('axios');
-const cors = require('cors');
 const cheerio = require('cheerio');
 const app = express();
-const PORT = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 
-// Enable CORS
-app.use(cors());
+app.get('/', async (req, res) => {
+    // Extract reservationDate and facility_id from the query parameters
+    const { reservationDate, facility_id, court_id } = req.query;
 
-// Create a route for fetching and parsing the data
-app.get('/proxy', async (req, res) => {
+    if (!reservationDate || !facility_id || !court_id) {
+        return res.status(400).send('Missing required parameters.');
+    }
+
     try {
-        // Ensure URL is passed and valid
-        const targetUrl = req.query.url;
-        if (!targetUrl) {
-            return res.status(400).send('URL parameter is required');
-        }
+        // Log the date to verify it's correct
+        console.log('Requested Reservation Date:', reservationDate);
 
-        // Make HTTP request to the target URL (Pavilion Rentals specific URL)
-        const response = await axios.get(targetUrl);
+        // Convert reservationDate into the correct format (if needed)
+        const parsedDate = new Date(reservationDate);
+        console.log('Parsed Date:', parsedDate);
 
-        // Parse the HTML content with Cheerio
+        // Fetch the schedule page
+        const response = await axios.get(`https://www.yourcourts.com/facility/viewer/8353821?reservationDate=${reservationDate}&facility_id=${facility_id}&court_id=${court_id}`);
+        
         const $ = cheerio.load(response.data);
-        
-        // Look for the table that contains the schedule data (may need adjustment based on actual HTML structure)
-        const scheduleRows = $('.schedule-table').find('tr');
 
-        const reservations = [];
-        
-        // Loop through each row and extract the schedule information
-        scheduleRows.each((i, row) => {
+        // Now parse the schedule using cheerio
+        const scheduleRows = [];
+        $('table tbody tr').each((index, row) => {
             const time = $(row).find('td.time').text().trim();
             const user = $(row).find('td.user').text().trim();
 
-            // Adjust logic here to match the content of your table
-            if (time && user) {
-                reservations.push({ time, user });
-            }
+            scheduleRows.push({ time, user });
         });
 
-        // Log only relevant information for debugging
-        console.log('Reservations (first 5 rows for brevity):', reservations.slice(0, 5));
+        console.log('Parsed Schedule Rows:', scheduleRows);
 
-        // Get the date from the query params (or use the current date if not provided)
-        const reservationDate = req.query.reservationDate ? new Date(req.query.reservationDate) : new Date();
-        console.log('Reservation Date:', reservationDate.toISOString());
-
-        // Adjust time parsing and compare with the current date/time
-        const currentTimeSlot = reservations.find((reservation) => {
-            const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
-            console.log('Comparing with current time:', reservationTime);
-            return reservationTime <= new Date() && reservationTime.getTime() > new Date().getTime() - 30 * 60 * 1000;
-        });
-
-        // Logic to display next user
-        const nextTimeSlot = reservations.find((reservation) => {
-            const reservationTime = new Date(reservationDate.toDateString() + ' ' + reservation.time);
-            console.log('Next reservation:', reservationTime);
-            return reservationTime > new Date();
-        });
-
-        // Process the current user
-        let currentUser = "Not currently reserved";
-        if (currentTimeSlot && currentTimeSlot.user !== "Not open") {
-            currentUser = currentTimeSlot.user === "Open" ? "Not currently reserved" : currentTimeSlot.user;
-        }
-
-        // Process the next user
-        let nextUser = "No upcoming reservation";
-        if (nextTimeSlot) {
-            nextUser = nextTimeSlot.user === "Open" ? "Not currently reserved" : nextTimeSlot.user;
-        }
-
-        // Send back the parsed results
-        res.json({
-            currentUser,
-            nextUser
-        });
-
+        res.json({ currentUser: 'Not currently reserved', nextUser: 'No upcoming reservation' });
     } catch (error) {
-        console.error('Error fetching target URL:', error);
-        res.status(500).send('Error fetching data');
+        console.error('Error fetching or parsing schedule:', error);
+        res.status(500).send('Error fetching or parsing schedule.');
     }
 });
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
 });
