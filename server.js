@@ -31,12 +31,10 @@ app.get('/proxy', async (req, res) => {
             currentUser: {
                 time: currentUser.time,
                 status: currentUser.status,
-                color: currentUser.color,
             },
             nextUser: {
                 time: nextUser.time || '',
                 status: nextUser.status || '',
-                color: nextUser.color || '',
             },
         };
 
@@ -51,15 +49,11 @@ app.get('/proxy', async (req, res) => {
 function processReservations(html) {
     const $ = cheerio.load(html);
     const reservations = [];
-    let currentReservation = {};
+    let currentReservation = null;
 
     $('tr').each((index, element) => {
         const time = $(element).find('td.court-time').text().trim();
         const status = $(element).find('td').last().text().trim();
-        const styleAttr = $(element).find('td').last().attr('style') || ''; // Ensure style exists
-
-        // If a style attribute is present, attempt to extract background-color
-        const color = styleAttr.match(/background-color:([^;]+)/)?.[1] || '';
 
         if (time && status) {
             if (status.includes('Member Event')) {
@@ -68,24 +62,21 @@ function processReservations(html) {
                 currentReservation = {
                     time,
                     status: statusWithoutMemberEvent,
-                    color,
                 };
             } else {
                 currentReservation = {
                     time,
                     status,
-                    color,
                 };
             }
-        }
 
-        reservations.push(currentReservation);
+            reservations.push(currentReservation);
+        }
     });
 
     // Group back-to-back reservations with the same status into a single reservation
     const groupedReservations = groupBackToBackReservations(reservations);
 
-    // Add additional rules for handling start/end time for current and next user
     return groupedReservations;
 }
 
@@ -94,12 +85,19 @@ function groupBackToBackReservations(reservations) {
     let currentGroup = null;
 
     reservations.forEach((reservation, index) => {
+        const reservationTime = reservation.time;
+        
         if (currentGroup === null) {
             currentGroup = reservation;
         } else {
-            if (reservation.status === currentGroup.status) {
-                currentGroup.time = `${currentGroup.time} - ${reservation.time}`;
-                currentGroup.endTime = reservation.time;
+            // If reservation times are consecutive (e.g., 10:00AM - 10:30AM), we group them together
+            const lastTime = currentGroup.time.split('-')[1].trim();
+            const newTime = reservationTime.split('-')[0].trim();
+
+            if (lastTime === newTime) {
+                currentGroup.time = `${currentGroup.time.split('-')[0]} - ${reservationTime.split('-')[1]}`;
+                // Update the end time for the group
+                currentGroup.endTime = reservationTime.split('-')[1].trim();
             } else {
                 grouped.push(currentGroup);
                 currentGroup = reservation;
