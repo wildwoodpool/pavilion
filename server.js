@@ -34,8 +34,8 @@ app.get('/proxy', async (req, res) => {
         // Remove HTML comments from the response data
         const cleanHtml = response.data.replace(/<!--[\s\S]*?-->/g, '');
 
-        // Log the first 500 characters of the cleaned HTML for debugging
-        console.log("Cleaned HTML response (first 500 characters):", cleanHtml.slice(0, 500));
+        // Log more of the cleaned HTML response to inspect the structure
+        console.log("Cleaned HTML response (first 1000 characters):", cleanHtml.slice(0, 1000));
 
         // If the response contains HTML, parse it using cheerio
         const $ = cheerio.load(cleanHtml);
@@ -43,8 +43,8 @@ app.get('/proxy', async (req, res) => {
         // Initialize an empty array for reservations
         let reservations = [];
 
-        // For the sake of the example, assuming reservation data is inside a table
-        // Update this selector based on your actual HTML structure
+        // Update this selector based on where the reservation data is located in the HTML
+        // Example: Finding a table or reservation rows (adjust based on actual page structure)
         $('table.reservation-table tr').each((index, element) => {
             const time = $(element).find('.time').text().trim();
             const username = $(element).find('.username').text().trim();
