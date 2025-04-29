@@ -1,10 +1,10 @@
-<!-- Version 25 -->
+<!-- Version 26 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v25)</title>
+  <title>Wildwood Manor Pool Pavilion (v26)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -73,7 +73,7 @@
 
     .date-heading {
       color: white;
-      font-size: 4vw; /* Smaller font now */
+      font-size: 4vw;
       white-space: nowrap;
       text-align: left;
       flex-shrink: 1;
@@ -125,14 +125,13 @@
       border-radius: 12px;
       padding: 2vw;
       margin: 2vh 0;
-      font-size: clamp(18px, 5vw, 34px);
+      font-size: clamp(12px, 4vw, 30px); /* <- dynamic sizing here */
       width: 100%;
       color: white;
       box-sizing: border-box;
       text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      white-space: normal; /* allow wrapping if absolutely necessary */
+      overflow-wrap: break-word; /* break long words */
       font-weight: normal;
     }
 
@@ -162,6 +161,7 @@
 </div>
 
 <script>
+// (Same JavaScript code from version 25, still correct)
 async function loadReservations(retry = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
