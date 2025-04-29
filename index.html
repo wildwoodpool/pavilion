@@ -1,10 +1,10 @@
-<!-- Version 4 -->
+<!-- Version 5 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v4)</title>
+  <title>Wildwood Manor Pool Pavilion (v5)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -154,11 +154,11 @@ async function loadReservations() {
       return;
     }
 
-    // Attach full date to start/end times
+    // Attach full date to start/end times using tz(..., true)
     const fullReservations = reservations.map(r => ({
       ...r,
-      startDateTime: dayjs(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York'),
-      endDateTime: dayjs(`${reservationDate} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York')
+      startDateTime: dayjs(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York', true),
+      endDateTime: dayjs(`${reservationDate} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York', true)
     }));
 
     let current = null;
