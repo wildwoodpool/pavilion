@@ -1,10 +1,10 @@
-<!-- Version 22 -->
+<!-- Version 23 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v22)</title>
+  <title>Wildwood Manor Pool Pavilion (v23)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -63,17 +63,19 @@
 
     .date-time-line {
       display: flex;
-      justify-content: center;
+      justify-content: space-between;
       align-items: center;
       width: 100%;
-      gap: 2vw;
+      padding: 0 5vw;
       margin: 2vh 0;
+      box-sizing: border-box;
     }
 
     .date-heading {
       color: white;
-      font-size: 4vw;
+      font-size: 6vw;
       white-space: nowrap;
+      text-align: left;
     }
 
     .current-time-box {
@@ -87,6 +89,7 @@
       flex-direction: column;
       justify-content: center;
       height: 100%;
+      min-width: 100px;
     }
 
     .current-time-label {
@@ -100,7 +103,7 @@
     }
 
     @media (max-width: 600px) {
-      .date-heading { font-size: 6vw; }
+      .date-heading { font-size: 8vw; }
       .current-time-label { font-size: 3vw; }
       .current-time-value { font-size: 6vw; }
     }
@@ -118,7 +121,7 @@
       border-radius: 12px;
       padding: 2vw;
       margin: 2vh 0;
-      font-size: clamp(14px, 4vw, 28px);
+      font-size: clamp(16px, 5vw, 32px);
       width: 100%;
       color: white;
       box-sizing: border-box;
@@ -223,7 +226,7 @@ async function loadReservations(retry = false) {
 
     for (let i = 0; i < fullReservations.length; i++) {
       const res = fullReservations[i];
-      if (!current && now.isAfter(res.startDateTime) && now.isBefore(res.endDateTime)) {
+      if (!current && (now.isSame(res.startDateTime) || now.isAfter(res.startDateTime)) && now.isBefore(res.endDateTime)) {
         current = res;
       } else if (!next && now.isBefore(res.startDateTime)) {
         next = res;
