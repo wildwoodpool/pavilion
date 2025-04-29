@@ -1,10 +1,10 @@
-<!-- Version 1 -->
+<!-- Version 2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v1)</title>
+  <title>Wildwood Manor Pool Pavilion (v2)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -20,12 +20,12 @@
       margin: 0;
       font-family: Arial, sans-serif;
       background: #112e46;
-      box-sizing: border-box;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
     }
 
+    /* Header */
     .header {
       background: white;
       display: flex;
@@ -56,11 +56,21 @@
       }
     }
 
+    /* Main content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2vw;
+      box-sizing: border-box;
+    }
+
     h2 {
       color: white;
       text-align: center;
-      margin-top: 4vh;
-      margin-bottom: 4vh;
+      margin: 4vh 0;
       font-size: 4vw;
     }
 
@@ -74,8 +84,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 2vw;
-      flex: 1;
+      width: 100%;
     }
 
     .reservation-box {
@@ -102,18 +111,18 @@
 
 <body>
 
-<!-- Visible Header -->
+<!-- White banner -->
 <div class="header">
   <img src="wildwood-manor.png" alt="Wildwood Manor Logo">
   <div class="header-text">Wildwood Manor Pool Pavilion</div>
 </div>
 
-<!-- Date Display -->
-<h2 id="date-heading">Loading date...</h2>
-
-<!-- Reservation List -->
-<div class="reservation-list" id="output">
-  Loading...
+<!-- Main Content: Date + Reservations -->
+<div class="main-content">
+  <h2 id="date-heading">Loading date...</h2>
+  <div class="reservation-list" id="output">
+    Loading...
+  </div>
 </div>
 
 <script>
@@ -144,6 +153,8 @@ async function loadReservations() {
     const displayDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
     document.getElementById('date-heading').innerText = displayDate.format('dddd, MMMM D, YYYY');
 
+    const reservationDay = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
+
     let current = null;
     let next = null;
     let later = [];
@@ -155,8 +166,8 @@ async function loadReservations() {
 
     for (let i = 0; i < reservations.length; i++) {
       const res = reservations[i];
-      const start = dayjs(res.startTime, 'h:mmA');
-      const end = dayjs(res.endTime, 'h:mmA');
+      const start = dayjs(`${reservationDay.format('M/D/YYYY')} ${res.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York');
+      const end = dayjs(`${reservationDay.format('M/D/YYYY')} ${res.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York');
 
       if (now.isAfter(start) && now.isBefore(end)) {
         current = res;
