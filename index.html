@@ -1,10 +1,10 @@
-<!-- Version 24 -->
+<!-- Version 25 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v24)</title>
+  <title>Wildwood Manor Pool Pavilion (v25)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -66,50 +66,50 @@
       justify-content: space-between;
       align-items: center;
       width: 100%;
-      padding: 0 6vw;
-      margin: 3vh 0;
+      padding: 0 5vw;
+      margin: 2vh 0;
       box-sizing: border-box;
     }
 
     .date-heading {
       color: white;
-      font-size: 7vw;
+      font-size: 4vw; /* Smaller font now */
       white-space: nowrap;
       text-align: left;
+      flex-shrink: 1;
     }
 
     .current-time-box {
       border: 2px solid white;
       border-radius: 10px;
-      padding: 0.5vw 1vw;
+      padding: 0.5vw 1.5vw;
       color: white;
       background-color: #112e46;
       text-align: center;
-      display: flex;
+      display: inline-flex;
       flex-direction: column;
-      justify-content: center;
       align-items: center;
       white-space: nowrap;
       height: 100%;
-      min-width: 100px;
+      flex-shrink: 0;
     }
 
     .current-time-label {
-      font-size: 2vw;
+      font-size: 1.8vw;
       opacity: 0.8;
       margin-bottom: 0.5vw;
     }
 
     .current-time-value {
-      font-size: 5vw;
+      font-size: 3vw;
       font-weight: bold;
       white-space: nowrap;
     }
 
     @media (max-width: 600px) {
-      .date-heading { font-size: 9vw; }
+      .date-heading { font-size: 6vw; }
       .current-time-label { font-size: 3vw; }
-      .current-time-value { font-size: 7vw; }
+      .current-time-value { font-size: 5vw; }
     }
 
     .reservation-list {
