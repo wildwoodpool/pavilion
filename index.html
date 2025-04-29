@@ -1,10 +1,10 @@
-<!-- Version 12 -->
+<!-- Version 13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v12)</title>
+  <title>Wildwood Manor Pool Pavilion (v13)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -149,16 +149,24 @@ async function loadReservations(retry = false) {
       return;
     }
 
-    const fullReservations = reservations.map(r => {
-      const startTimeParts = dayjs(r.startTime, 'h:mmA');
-      const endTimeParts = dayjs(r.endTime, 'h:mmA');
+    // Safely parse reservations
+    const fullReservations = reservations
+      .map(r => {
+        const start = dayjs(r.startTime, 'h:mmA');
+        const end = dayjs(r.endTime, 'h:mmA');
 
-      return {
-        ...r,
-        startDateTime: baseDate.clone().hour(startTimeParts.hour()).minute(startTimeParts.minute()),
-        endDateTime: baseDate.clone().hour(endTimeParts.hour()).minute(endTimeParts.minute())
-      };
-    });
+        if (!start.isValid() || !end.isValid()) {
+          console.warn('Skipping invalid reservation:', r);
+          return null;
+        }
+
+        return {
+          ...r,
+          startDateTime: baseDate.clone().hour(start.hour()).minute(start.minute()),
+          endDateTime: baseDate.clone().hour(end.hour()).minute(end.minute())
+        };
+      })
+      .filter(r => r !== null);
 
     let current = null;
     let next = null;
@@ -199,6 +207,7 @@ async function loadReservations(retry = false) {
   } catch (error) {
     console.error('Error loading reservations:', error);
     if (!retry) {
+      console.log('Retrying in 2 seconds...');
       setTimeout(() => loadReservations(true), 2000);
     } else {
       document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
@@ -206,7 +215,7 @@ async function loadReservations(retry = false) {
   }
 }
 
-// Load + auto-refresh
+// Initialize
 loadReservations();
 setInterval(loadReservations, 5 * 60 * 1000);
 </script>
