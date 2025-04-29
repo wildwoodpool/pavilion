@@ -1,0 +1,44 @@
+<!-- DIAGNOSTIC version -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wildwood Manor Pool Pavilion (DIAGNOSTIC)</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
+  <script>
+    dayjs.extend(dayjs_plugin_utc);
+    dayjs.extend(dayjs_plugin_timezone);
+  </script>
+</head>
+
+<body>
+
+<h1>Loading...</h1>
+
+<script>
+async function loadReservations() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const reservationDateStr = urlParams.get('reservationDate');
+  const timeOverrideStr = urlParams.get('time');
+
+  console.log("reservationDateStr:", reservationDateStr);
+  console.log("timeOverrideStr:", timeOverrideStr);
+
+  if (reservationDateStr && timeOverrideStr) {
+    console.log(`Trying to combine: ${reservationDateStr} ${timeOverrideStr}`);
+    const fullString = `${reservationDateStr} ${timeOverrideStr}`;
+    const parsed = dayjs.tz(fullString, 'M/D/YYYY h:mmA', 'America/New_York');
+    console.log("Parsed datetime object:", parsed.toString());
+    console.log("Valid?", parsed.isValid());
+  }
+}
+
+loadReservations();
+</script>
+
+</body>
+</html>
