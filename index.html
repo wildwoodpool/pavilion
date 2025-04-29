@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pavilion Reservations</title>
+
+  <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
@@ -10,27 +13,62 @@
     dayjs.extend(dayjs_plugin_utc);
     dayjs.extend(dayjs_plugin_timezone);
   </script>
+
+  <!-- Styling for big responsive text -->
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 20px;
+      padding: 5vw;
+      margin: 0;
       background: #f9f9f9;
+      height: 100vh;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
     }
+
+    h1 {
+      font-size: 5vw;
+      margin-bottom: 3vh;
+    }
+
+    #today-date {
+      font-size: 2vw;
+      margin-bottom: 4vh;
+    }
+
     .reservation-output {
-      font-size: 1.2em;
+      font-size: 4vw;
       background: white;
-      padding: 20px;
+      padding: 4vw;
       border-radius: 8px;
       box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 1000px;
+      box-sizing: border-box;
     }
-    h1 {
-      text-align: center;
+
+    @media (max-width: 600px) {
+      h1 {
+        font-size: 8vw;
+      }
+      #today-date {
+        font-size: 5vw;
+      }
+      .reservation-output {
+        font-size: 6vw;
+      }
     }
   </style>
 </head>
+
 <body>
 
 <h1>Pavilion Schedule</h1>
+<div id="today-date"></div>
 <div class="reservation-output" id="output">Loading...</div>
 
 <script>
@@ -112,7 +150,16 @@ async function loadReservations() {
   }
 }
 
+function displayToday() {
+  const now = dayjs().tz('America/New_York');
+  const formatted = now.format('dddd, MMMM D, YYYY'); // Example: "Sunday, June 1, 2025"
+  document.getElementById('today-date').innerText = formatted;
+}
+
+// Initialize
+displayToday();
 loadReservations();
+setInterval(loadReservations, 5 * 60 * 1000); // Refresh every 5 minutes
 </script>
 
 </body>
