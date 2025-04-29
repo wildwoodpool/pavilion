@@ -1,10 +1,10 @@
-<!-- Version 20 FINAL -->
+<!-- Version 22 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v20)</title>
+  <title>Wildwood Manor Pool Pavilion (v22)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -61,15 +61,48 @@
       box-sizing: border-box;
     }
 
-    h2 {
-      color: white;
-      text-align: center;
+    .date-time-line {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      gap: 2vw;
       margin: 2vh 0;
+    }
+
+    .date-heading {
+      color: white;
       font-size: 4vw;
+      white-space: nowrap;
+    }
+
+    .current-time-box {
+      border: 2px solid white;
+      border-radius: 10px;
+      padding: 1vw 2vw;
+      color: white;
+      background-color: #112e46;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+    }
+
+    .current-time-label {
+      font-size: 2vw;
+      opacity: 0.8;
+    }
+
+    .current-time-value {
+      font-size: 4vw;
+      font-weight: bold;
     }
 
     @media (max-width: 600px) {
-      h2 { font-size: 6vw; }
+      .date-heading { font-size: 6vw; }
+      .current-time-label { font-size: 3vw; }
+      .current-time-value { font-size: 6vw; }
     }
 
     .reservation-list {
@@ -83,18 +116,22 @@
       background: #5783c8;
       border: 2px solid black;
       border-radius: 12px;
-      padding: 4vw;
+      padding: 2vw;
       margin: 2vh 0;
-      font-size: 4vw;
+      font-size: clamp(14px, 4vw, 28px);
       width: 100%;
-      max-width: 800px;
       color: white;
       box-sizing: border-box;
       text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: normal;
     }
 
-    @media (max-width: 600px) {
-      .reservation-box { font-size: 6vw; }
+    .current-reservation {
+      font-weight: bold;
+      background: #2f5597;
     }
   </style>
 </head>
@@ -107,7 +144,13 @@
 </div>
 
 <div class="main-content">
-  <h2 id="date-heading">Loading date...</h2>
+  <div class="date-time-line">
+    <div class="date-heading" id="date-heading">Loading date...</div>
+    <div class="current-time-box">
+      <div class="current-time-label">Current time</div>
+      <div class="current-time-value" id="current-time">--:--</div>
+    </div>
+  </div>
   <div class="reservation-list" id="output">Loading...</div>
 </div>
 
@@ -121,8 +164,6 @@ async function loadReservations(retry = false) {
     const court_id = 15094;
 
     const fetchUrl = `https://pavilion.onrender.com/proxy?${reservationDateStr ? `reservationDate=${encodeURIComponent(reservationDateStr)}&` : ''}facility_id=${facility_id}&court_id=${court_id}`;
-
-    console.log("Fetching:", fetchUrl);
 
     const response = await fetch(fetchUrl);
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
@@ -140,7 +181,6 @@ async function loadReservations(retry = false) {
       if (localParse.isValid()) {
         now = localParse.tz('America/New_York');
       } else {
-        console.error('Invalid datetime override format!');
         now = baseDate.startOf('day');
       }
     } else {
@@ -148,6 +188,7 @@ async function loadReservations(retry = false) {
     }
 
     document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
+    updateCurrentTime(now);
 
     if (reservations.length === 0) {
       document.getElementById('output').innerHTML =
@@ -166,7 +207,6 @@ async function loadReservations(retry = false) {
         const start = parseFullDateTime(reservationDateStr, r.startTime);
         const end = parseFullDateTime(reservationDateStr, r.endTime);
         if (!start || !end) {
-          console.warn('Skipping invalid reservation:', r);
           return null;
         }
         return {
@@ -200,17 +240,17 @@ async function loadReservations(retry = false) {
     let outputHtml = "";
 
     if (current) {
-      outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${formatTime(current.startDateTime)} - ${formatTime(current.endDateTime)})</div>`;
+      outputHtml += `<div class="reservation-box current-reservation">Current reservation: ${current.status} (${formatTime(current.startDateTime)} - ${formatTime(current.endDateTime)})</div>`;
       if (next) {
-        outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${formatTime(next.startDateTime)}</div>`;
+        outputHtml += `<div class="reservation-box">Next reservation: ${next.status} at ${formatTime(next.startDateTime)}</div>`;
       }
       later.forEach(r => {
-        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${formatTime(r.startDateTime)}</div>`;
+        outputHtml += `<div class="reservation-box">Coming up later: ${r.status} at ${formatTime(r.startDateTime)}</div>`;
       });
     } else if (next) {
-      outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${formatTime(next.startDateTime)}</div>`;
+      outputHtml += `<div class="reservation-box">Next reservation: ${next.status} at ${formatTime(next.startDateTime)}</div>`;
       later.forEach(r => {
-        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${formatTime(r.startDateTime)}</div>`;
+        outputHtml += `<div class="reservation-box">Coming up later: ${r.status} at ${formatTime(r.startDateTime)}</div>`;
       });
     } else {
       outputHtml = '<div class="reservation-box">No more reservations today.</div>';
@@ -225,6 +265,13 @@ async function loadReservations(retry = false) {
     } else {
       document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
     }
+  }
+}
+
+function updateCurrentTime(now) {
+  const currentTimeElement = document.getElementById('current-time');
+  if (currentTimeElement && now) {
+    currentTimeElement.innerText = now.format('h:mm A');
   }
 }
 
