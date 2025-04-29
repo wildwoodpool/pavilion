@@ -1,10 +1,10 @@
-<!-- Version 7 -->
+<!-- Version 8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v7)</title>
+  <title>Wildwood Manor Pool Pavilion (v8)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -138,13 +138,13 @@ async function loadReservations() {
     const data = await response.json();
     const reservations = data.reservations || [];
 
-    const baseDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : dayjs().tz('America/New_York');
+    const baseDate = reservationDate ? dayjs.tz(reservationDate, 'M/D/YYYY', 'America/New_York') : dayjs().tz('America/New_York');
 
     let now;
     if (reservationDate && timeOverride) {
-      now = dayjs(`${reservationDate} ${timeOverride}`, 'M/D/YYYY h:mmA').tz('America/New_York');
+      now = dayjs.tz(`${reservationDate} ${timeOverride}`, 'M/D/YYYY h:mmA', 'America/New_York');
     } else {
-      now = baseDate;
+      now = dayjs().tz('America/New_York');
     }
 
     document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
@@ -154,11 +154,11 @@ async function loadReservations() {
       return;
     }
 
-    // Attach full date to start/end times
+    // Properly attach full reservationDate to start/end using tz()
     const fullReservations = reservations.map(r => ({
       ...r,
-      startDateTime: dayjs(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York', true),
-      endDateTime: dayjs(`${reservationDate} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York', true)
+      startDateTime: dayjs.tz(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA', 'America/New_York'),
+      endDateTime: dayjs.tz(`${reservationDate} ${r.endTime}`, 'M/D/YYYY h:mmA', 'America/New_York')
     }));
 
     let current = null;
