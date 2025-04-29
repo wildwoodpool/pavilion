@@ -1,12 +1,11 @@
-<!-- Version 11 -->
+<!-- Version 12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v11)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wildwood Manor Pool Pavilion (v12)</title>
 
-  <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
@@ -47,12 +46,8 @@
     }
 
     @media (max-width: 600px) {
-      .header-text {
-        font-size: 8vw;
-      }
-      .header img {
-        height: 10vw;
-      }
+      .header-text { font-size: 8vw; }
+      .header img { height: 10vw; }
     }
 
     .main-content {
@@ -72,9 +67,7 @@
     }
 
     @media (max-width: 600px) {
-      h2 {
-        font-size: 6vw;
-      }
+      h2 { font-size: 6vw; }
     }
 
     .reservation-list {
@@ -99,9 +92,7 @@
     }
 
     @media (max-width: 600px) {
-      .reservation-box {
-        font-size: 6vw;
-      }
+      .reservation-box { font-size: 6vw; }
     }
   </style>
 </head>
@@ -115,41 +106,37 @@
 
 <div class="main-content">
   <h2 id="date-heading">Loading date...</h2>
-  <div class="reservation-list" id="output">
-    Loading...
-  </div>
+  <div class="reservation-list" id="output">Loading...</div>
 </div>
 
 <script>
 async function loadReservations(retry = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    const reservationDate = urlParams.get('reservationDate');
-    const timeOverride = urlParams.get('time');
+    const reservationDateStr = urlParams.get('reservationDate');
+    const timeOverrideStr = urlParams.get('time');
     const facility_id = 2103;
     const court_id = 15094;
 
-    let queryString = `facility_id=${facility_id}&court_id=${court_id}`;
-    if (reservationDate) {
-      queryString += `&reservationDate=${encodeURIComponent(reservationDate)}`;
-    }
-
-    const fetchUrl = `https://pavilion.onrender.com/proxy?${queryString}`;
-    console.log("Fetching from URL:", fetchUrl);
+    const fetchUrl = `https://pavilion.onrender.com/proxy?facility_id=${facility_id}&court_id=${court_id}` +
+                     (reservationDateStr ? `&reservationDate=${encodeURIComponent(reservationDateStr)}` : '');
 
     const response = await fetch(fetchUrl);
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
-    const reservations = data.reservations || [];
 
-    const baseDate = reservationDate ? dayjs.tz(reservationDate, 'M/D/YYYY', 'America/New_York') : dayjs().tz('America/New_York');
+    const reservations = data.reservations || [];
+    const baseDate = reservationDateStr
+      ? dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York')
+      : dayjs().tz('America/New_York');
 
     let now;
-    if (reservationDate && timeOverride) {
-      now = dayjs.tz(`${reservationDate} ${timeOverride}`, 'M/D/YYYY h:mmA', 'America/New_York');
+    if (reservationDateStr && timeOverrideStr) {
+      const tryNow = dayjs.tz(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA', 'America/New_York');
+      if (!tryNow.isValid()) {
+        throw new Error(`Invalid time override: "${timeOverrideStr}"`);
+      }
+      now = tryNow;
     } else {
       now = dayjs().tz('America/New_York');
     }
@@ -157,19 +144,19 @@ async function loadReservations(retry = false) {
     document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
 
     if (reservations.length === 0) {
-      document.getElementById('output').innerHTML = '<div class="reservation-box">No Pavilion reservations today.</div>';
+      document.getElementById('output').innerHTML =
+        '<div class="reservation-box">No Pavilion reservations today.</div>';
       return;
     }
 
-    // Parse full times based on baseDate
     const fullReservations = reservations.map(r => {
-      const startParts = dayjs(r.startTime, 'h:mmA');
-      const endParts = dayjs(r.endTime, 'h:mmA');
+      const startTimeParts = dayjs(r.startTime, 'h:mmA');
+      const endTimeParts = dayjs(r.endTime, 'h:mmA');
 
       return {
         ...r,
-        startDateTime: baseDate.hour(startParts.hour()).minute(startParts.minute()),
-        endDateTime: baseDate.hour(endParts.hour()).minute(endParts.minute())
+        startDateTime: baseDate.clone().hour(startTimeParts.hour()).minute(startTimeParts.minute()),
+        endDateTime: baseDate.clone().hour(endTimeParts.hour()).minute(endTimeParts.minute())
       };
     });
 
@@ -179,7 +166,6 @@ async function loadReservations(retry = false) {
 
     for (let i = 0; i < fullReservations.length; i++) {
       const res = fullReservations[i];
-
       if (!current && now.isAfter(res.startDateTime) && now.isBefore(res.endDateTime)) {
         current = res;
       } else if (!next && now.isBefore(res.startDateTime)) {
@@ -196,18 +182,14 @@ async function loadReservations(retry = false) {
       if (next) {
         outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startTime}</div>`;
       }
-      if (later.length > 0) {
-        later.forEach(r => {
-          outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
-        });
-      }
+      later.forEach(r => {
+        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
+      });
     } else if (next) {
       outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startTime}</div>`;
-      if (later.length > 0) {
-        later.forEach(r => {
-          outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
-        });
-      }
+      later.forEach(r => {
+        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
+      });
     } else {
       outputHtml = '<div class="reservation-box">No more reservations today.</div>';
     }
@@ -216,9 +198,7 @@ async function loadReservations(retry = false) {
 
   } catch (error) {
     console.error('Error loading reservations:', error);
-
     if (!retry) {
-      console.log('Retrying in 2 seconds...');
       setTimeout(() => loadReservations(true), 2000);
     } else {
       document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
@@ -226,9 +206,9 @@ async function loadReservations(retry = false) {
   }
 }
 
-// Initialize
+// Load + auto-refresh
 loadReservations();
-setInterval(loadReservations, 5 * 60 * 1000); // Refresh every 5 minutes
+setInterval(loadReservations, 5 * 60 * 1000);
 </script>
 
 </body>
