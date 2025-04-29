@@ -1,10 +1,10 @@
-<!-- Version 16 -->
+<!-- Version 17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v16)</title>
+  <title>Wildwood Manor Pool Pavilion (v17)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -192,20 +192,25 @@ async function loadReservations(retry = false) {
       }
     }
 
+    function formatTime(timeObj) {
+      if (!timeObj || !timeObj.isValid()) return "(Invalid time)";
+      return timeObj.format('h:mmA');
+    }
+
     let outputHtml = "";
 
     if (current) {
-      outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${current.startDateTime.format('h:mmA')} - ${current.endDateTime.format('h:mmA')})</div>`;
+      outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${formatTime(current.startDateTime)} - ${formatTime(current.endDateTime)})</div>`;
       if (next) {
-        outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startDateTime.format('h:mmA')}</div>`;
+        outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${formatTime(next.startDateTime)}</div>`;
       }
       later.forEach(r => {
-        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startDateTime.format('h:mmA')}</div>`;
+        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${formatTime(r.startDateTime)}</div>`;
       });
     } else if (next) {
-      outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startDateTime.format('h:mmA')}</div>`;
+      outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${formatTime(next.startDateTime)}</div>`;
       later.forEach(r => {
-        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startDateTime.format('h:mmA')}</div>`;
+        outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${formatTime(r.startDateTime)}</div>`;
       });
     } else {
       outputHtml = '<div class="reservation-box">No more reservations today.</div>';
