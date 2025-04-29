@@ -1,10 +1,10 @@
-<!-- Version 3 -->
+<!-- Version 4 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v3)</title>
+  <title>Wildwood Manor Pool Pavilion (v4)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -55,7 +55,6 @@
       }
     }
 
-    /* Main content */
     .main-content {
       flex: 1;
       display: flex;
@@ -109,13 +108,11 @@
 
 <body>
 
-<!-- White banner -->
 <div class="header">
   <img src="wildwood-manor.png" alt="Wildwood Manor Logo">
   <div class="header-text">Wildwood Manor Pool Pavilion</div>
 </div>
 
-<!-- Main content -->
 <div class="main-content">
   <h2 id="date-heading">Loading date...</h2>
   <div class="reservation-list" id="output">
@@ -141,28 +138,27 @@ async function loadReservations() {
     const data = await response.json();
     const reservations = data.reservations || [];
 
+    const baseDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : dayjs().tz('America/New_York');
+
     let now;
     if (reservationDate && timeOverride) {
       now = dayjs(`${reservationDate} ${timeOverride}`, 'M/D/YYYY h:mmA').tz('America/New_York');
     } else {
-      now = dayjs().tz('America/New_York');
+      now = baseDate;
     }
 
-    const displayDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
-    document.getElementById('date-heading').innerText = displayDate.format('dddd, MMMM D, YYYY');
-
-    const reservationDay = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
+    document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
 
     if (reservations.length === 0) {
       document.getElementById('output').innerHTML = '<div class="reservation-box">No Pavilion reservations today.</div>';
       return;
     }
 
-    // Attach date to reservation times
+    // Attach full date to start/end times
     const fullReservations = reservations.map(r => ({
       ...r,
-      startDateTime: dayjs(`${reservationDay.format('M/D/YYYY')} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York'),
-      endDateTime: dayjs(`${reservationDay.format('M/D/YYYY')} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York')
+      startDateTime: dayjs(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York'),
+      endDateTime: dayjs(`${reservationDate} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York')
     }));
 
     let current = null;
