@@ -1,10 +1,10 @@
-<!-- Version 9 -->
+<!-- Version 10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v9)</title>
+  <title>Wildwood Manor Pool Pavilion (v10)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -121,7 +121,7 @@
 </div>
 
 <script>
-async function loadReservations() {
+async function loadReservations(retry = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const reservationDate = urlParams.get('reservationDate');
@@ -135,7 +135,7 @@ async function loadReservations() {
     }
 
     const fetchUrl = `https://pavilion.onrender.com/proxy?${queryString}`;
-    console.log("Fetching from URL:", fetchUrl); // Log it
+    console.log("Fetching from URL:", fetchUrl);
 
     const response = await fetch(fetchUrl);
     if (!response.ok) {
@@ -210,7 +210,13 @@ async function loadReservations() {
 
   } catch (error) {
     console.error('Error loading reservations:', error);
-    document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
+
+    if (!retry) {
+      console.log('Retrying in 2 seconds...');
+      setTimeout(() => loadReservations(true), 2000);
+    } else {
+      document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
+    }
   }
 }
 
