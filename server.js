@@ -1,4 +1,4 @@
-// FINAL FINAL server.js (strips times from status descriptions)
+// FINAL FINAL FINAL server.js (with 9:00PM fallback)
 
 const express = require('express');
 const cors = require('cors');
@@ -48,7 +48,7 @@ app.get('/proxy', async (req, res) => {
     // Step 2: Remove placeholders (status = startTime)
     const filtered = raw.filter(r => r.status !== r.startTime);
 
-    // Step 3: Merge consecutive identical events, including setup/takedown in timeline
+    // Step 3: Merge consecutive identical events
     const merged = [];
     let i = 0;
     while (i < filtered.length) {
@@ -62,13 +62,12 @@ app.get('/proxy', async (req, res) => {
         j++;
       }
 
-      // Use the next real event's start time as end time
       current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
       merged.push(current);
       i = j;
     }
 
-    // Step 4: Adjust end times based on full timeline
+    // Step 4: Adjust end times based on timeline
     for (let k = 0; k < merged.length - 1; k++) {
       merged[k].endTime = merged[k + 1].startTime;
     }
@@ -91,6 +90,14 @@ app.get('/proxy', async (req, res) => {
       }))
       .filter(r => r.status && !ignoreStatuses.includes(r.status));
 
+    // Step 6: Handle the last event fallback to 9:00PM
+    if (cleaned.length > 0) {
+      const last = cleaned[cleaned.length - 1];
+      if (!last.endTime || last.endTime === last.startTime) {
+        last.endTime = '9:00PM';
+      }
+    }
+
     console.table(cleaned);
     res.json({ reservations: cleaned });
 
@@ -107,7 +114,7 @@ function isValidTime(str) {
 function cleanStatus(status) {
   // Remove leading time range like "11:30AM - 1:30PM"
   status = status.replace(/^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i, '');
-  
+
   // Remove "Member Event"
   status = status.replace(/Member Event/gi, '');
 
