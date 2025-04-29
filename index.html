@@ -1,10 +1,10 @@
-<!-- Version 6 -->
+<!-- Version 7 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v6)</title>
+  <title>Wildwood Manor Pool Pavilion (v7)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -154,7 +154,7 @@ async function loadReservations() {
       return;
     }
 
-    // Attach full date to start/end times using tz(..., true)
+    // Attach full date to start/end times
     const fullReservations = reservations.map(r => ({
       ...r,
       startDateTime: dayjs(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York', true),
@@ -168,23 +168,17 @@ async function loadReservations() {
     for (let i = 0; i < fullReservations.length; i++) {
       const res = fullReservations[i];
 
-      if (now.isAfter(res.startDateTime) && now.isBefore(res.endDateTime)) {
+      if (!current && now.isAfter(res.startDateTime) && now.isBefore(res.endDateTime)) {
         current = res;
-        next = fullReservations[i + 1] || null;
-        later = fullReservations.slice(i + 2);
-        break;
-      }
-
-      if (now.isBefore(res.startDateTime)) {
+      } else if (!next && now.isBefore(res.startDateTime)) {
         next = res;
-        later = fullReservations.slice(i + 1);
-        break;
+      } else if (next) {
+        later.push(res);
       }
     }
 
     let outputHtml = "";
 
-    // NEW FIXED LOGIC
     if (current) {
       outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${current.startTime} - ${current.endTime})</div>`;
       if (next) {
