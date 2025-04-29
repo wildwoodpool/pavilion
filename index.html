@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pavilion Reservations</title>
+  <title>Wildwood Manor Pool Pavilion</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -14,51 +14,88 @@
     dayjs.extend(dayjs_plugin_timezone);
   </script>
 
-  <!-- Styling for big responsive text -->
+  <!-- Styling -->
   <style>
     body {
-      font-family: Arial, sans-serif;
-      padding: 5vw;
       margin: 0;
-      background: #f9f9f9;
-      height: 100vh;
+      font-family: Arial, sans-serif;
+      background: #112e46;
       box-sizing: border-box;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
+      min-height: 100vh;
     }
 
-    h1 {
-      font-size: 5vw;
-      margin-bottom: 3vh;
-    }
-
-    #today-date {
-      font-size: 2vw;
-      margin-bottom: 4vh;
-    }
-
-    .reservation-output {
-      font-size: 4vw;
+    /* Top header bar */
+    .header {
       background: white;
-      padding: 4vw;
-      border-radius: 8px;
-      box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 1000px;
-      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      padding: 1vw;
+      justify-content: center;
+    }
+
+    .header img {
+      height: 8vw;
+      max-height: 80px;
+      margin-right: 1vw;
+    }
+
+    .header-text {
+      font-size: 5vw;
+      font-weight: bold;
+      color: black;
+      white-space: nowrap;
     }
 
     @media (max-width: 600px) {
-      h1 {
+      .header-text {
         font-size: 8vw;
       }
-      #today-date {
-        font-size: 5vw;
+      .header img {
+        height: 10vw;
       }
-      .reservation-output {
+    }
+
+    /* Date heading */
+    h2 {
+      color: white;
+      text-align: center;
+      margin: 2vh 0;
+      font-size: 4vw;
+    }
+
+    @media (max-width: 600px) {
+      h2 {
+        font-size: 6vw;
+      }
+    }
+
+    /* Reservation box styling */
+    .reservation-list {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2vw;
+      flex: 1;
+    }
+
+    .reservation-box {
+      background: #5783c8;
+      border: 2px solid black;
+      border-radius: 12px;
+      padding: 4vw;
+      margin: 2vh 0;
+      font-size: 4vw;
+      width: 100%;
+      max-width: 800px;
+      color: white;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    @media (max-width: 600px) {
+      .reservation-box {
         font-size: 6vw;
       }
     }
@@ -67,9 +104,19 @@
 
 <body>
 
-<h1>Pavilion Schedule</h1>
-<div id="today-date"></div>
-<div class="reservation-output" id="output">Loading...</div>
+<!-- Header with logo and title -->
+<div class="header">
+  <img src="wildwood-manor.png" alt="Wildwood Manor Logo">
+  <div class="header-text">Wildwood Manor Pool Pavilion</div>
+</div>
+
+<!-- Date Heading -->
+<h2 id="date-heading">Loading date...</h2>
+
+<!-- Reservation List -->
+<div class="reservation-list" id="output">
+  Loading...
+</div>
 
 <script>
 async function loadReservations() {
@@ -89,12 +136,15 @@ async function loadReservations() {
     const reservations = data.reservations || [];
 
     const now = dayjs().tz('America/New_York');
+    const displayDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
+    document.getElementById('date-heading').innerText = displayDate.format('dddd, MMMM D, YYYY');
+
     let current = null;
     let next = null;
     let later = [];
 
     if (reservations.length === 0) {
-      document.getElementById('output').innerText = "Not reserved today.";
+      document.getElementById('output').innerHTML = '<div class="reservation-box">Not reserved today.</div>';
       return;
     }
 
@@ -117,47 +167,43 @@ async function loadReservations() {
       }
     }
 
-    let output = "";
+    let outputHtml = "";
 
     if (!current && !next) {
-      output = "No more reservations today.";
+      outputHtml = '<div class="reservation-box">No more reservations today.</div>';
     } else if (current) {
-      output += `Current reservation: ${current.status} (${current.startTime} - ${current.endTime})\n\n`;
+      outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${current.startTime} - ${current.endTime})</div>`;
       if (next) {
-        output += `Next reservation: ${next.status} at ${next.startTime}\n`;
+        outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startTime}</div>`;
       }
       if (later.length > 0) {
-        output += "\nComing up later:\n";
         later.forEach(r => {
-          output += `- ${r.status} at ${r.startTime}\n`;
+          outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
         });
       }
     } else if (next) {
-      output += `Next reservation: ${next.status} at ${next.startTime}\n`;
+      outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startTime}</div>`;
       if (later.length > 0) {
-        output += "\nComing up later:\n";
         later.forEach(r => {
-          output += `- ${r.status} at ${r.startTime}\n`;
+          outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
         });
       }
     }
 
-    document.getElementById('output').innerText = output.trim();
+    document.getElementById('output').innerHTML = outputHtml;
 
   } catch (error) {
     console.error('Error loading reservations:', error);
-    document.getElementById('output').innerText = "Error loading reservations.";
+    document.getElementById('output').innerHTML = '<div class="reservation-box">Error loading reservations.</div>';
   }
 }
 
 function displayToday() {
   const now = dayjs().tz('America/New_York');
-  const formatted = now.format('dddd, MMMM D, YYYY'); // Example: "Sunday, June 1, 2025"
-  document.getElementById('today-date').innerText = formatted;
+  document.getElementById('date-heading').innerText = now.format('dddd, MMMM D, YYYY');
 }
 
 // Initialize
-displayToday();
 loadReservations();
 setInterval(loadReservations, 5 * 60 * 1000); // Refresh every 5 minutes
 </script>
