@@ -1,10 +1,10 @@
-<!-- Version 5 -->
+<!-- Version 6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v5)</title>
+  <title>Wildwood Manor Pool Pavilion (v6)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -184,9 +184,8 @@ async function loadReservations() {
 
     let outputHtml = "";
 
-    if (!current && !next) {
-      outputHtml = '<div class="reservation-box">No more reservations today.</div>';
-    } else if (current) {
+    // NEW FIXED LOGIC
+    if (current) {
       outputHtml += `<div class="reservation-box">Current reservation:<br>${current.status}<br>(${current.startTime} - ${current.endTime})</div>`;
       if (next) {
         outputHtml += `<div class="reservation-box">Next reservation:<br>${next.status}<br>at ${next.startTime}</div>`;
@@ -203,6 +202,8 @@ async function loadReservations() {
           outputHtml += `<div class="reservation-box">Coming up later:<br>${r.status}<br>at ${r.startTime}</div>`;
         });
       }
+    } else {
+      outputHtml = '<div class="reservation-box">No more reservations today.</div>';
     }
 
     document.getElementById('output').innerHTML = outputHtml;
