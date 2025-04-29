@@ -1,10 +1,10 @@
-<!-- Version 8 -->
+<!-- Version 9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wildwood Manor Pool Pavilion (v8)</title>
+  <title>Wildwood Manor Pool Pavilion (v9)</title>
 
   <!-- Load dayjs with timezone plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -134,7 +134,14 @@ async function loadReservations() {
       queryString += `&reservationDate=${encodeURIComponent(reservationDate)}`;
     }
 
-    const response = await fetch(`https://pavilion.onrender.com/proxy?${queryString}`);
+    const fetchUrl = `https://pavilion.onrender.com/proxy?${queryString}`;
+    console.log("Fetching from URL:", fetchUrl); // Log it
+
+    const response = await fetch(fetchUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
     const data = await response.json();
     const reservations = data.reservations || [];
 
@@ -154,7 +161,6 @@ async function loadReservations() {
       return;
     }
 
-    // Properly attach full reservationDate to start/end using tz()
     const fullReservations = reservations.map(r => ({
       ...r,
       startDateTime: dayjs.tz(`${reservationDate} ${r.startTime}`, 'M/D/YYYY h:mmA', 'America/New_York'),
@@ -204,7 +210,7 @@ async function loadReservations() {
 
   } catch (error) {
     console.error('Error loading reservations:', error);
-    document.getElementById('output').innerHTML = '<div class="reservation-box">Error loading reservations.</div>';
+    document.getElementById('output').innerHTML = `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
   }
 }
 
