@@ -14,7 +14,6 @@
     dayjs.extend(dayjs_plugin_timezone);
   </script>
 
-  <!-- Styling -->
   <style>
     body {
       margin: 0;
@@ -26,7 +25,6 @@
       min-height: 100vh;
     }
 
-    /* Top header bar */
     .header {
       background: white;
       display: flex;
@@ -57,11 +55,11 @@
       }
     }
 
-    /* Date heading */
     h2 {
       color: white;
       text-align: center;
-      margin: 2vh 0;
+      margin-top: 4vh;
+      margin-bottom: 4vh;
       font-size: 4vw;
     }
 
@@ -71,7 +69,6 @@
       }
     }
 
-    /* Reservation box styling */
     .reservation-list {
       display: flex;
       flex-direction: column;
@@ -104,16 +101,13 @@
 
 <body>
 
-<!-- Header with logo and title -->
 <div class="header">
   <img src="wildwood-manor.png" alt="Wildwood Manor Logo">
   <div class="header-text">Wildwood Manor Pool Pavilion</div>
 </div>
 
-<!-- Date Heading -->
 <h2 id="date-heading">Loading date...</h2>
 
-<!-- Reservation List -->
 <div class="reservation-list" id="output">
   Loading...
 </div>
@@ -123,6 +117,7 @@ async function loadReservations() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
     const reservationDate = urlParams.get('reservationDate');
+    const timeOverride = urlParams.get('time');
     const facility_id = 2103;
     const court_id = 15094;
 
@@ -135,7 +130,13 @@ async function loadReservations() {
     const data = await response.json();
     const reservations = data.reservations || [];
 
-    const now = dayjs().tz('America/New_York');
+    let now;
+    if (reservationDate && timeOverride) {
+      now = dayjs(`${reservationDate} ${timeOverride}`, 'M/D/YYYY h:mmA').tz('America/New_York');
+    } else {
+      now = dayjs().tz('America/New_York');
+    }
+
     const displayDate = reservationDate ? dayjs(reservationDate, 'M/D/YYYY').tz('America/New_York') : now;
     document.getElementById('date-heading').innerText = displayDate.format('dddd, MMMM D, YYYY');
 
@@ -144,7 +145,7 @@ async function loadReservations() {
     let later = [];
 
     if (reservations.length === 0) {
-      document.getElementById('output').innerHTML = '<div class="reservation-box">Not reserved today.</div>';
+      document.getElementById('output').innerHTML = '<div class="reservation-box">No Pavilion reservations today.</div>';
       return;
     }
 
@@ -196,11 +197,6 @@ async function loadReservations() {
     console.error('Error loading reservations:', error);
     document.getElementById('output').innerHTML = '<div class="reservation-box">Error loading reservations.</div>';
   }
-}
-
-function displayToday() {
-  const now = dayjs().tz('America/New_York');
-  document.getElementById('date-heading').innerText = now.format('dddd, MMMM D, YYYY');
 }
 
 // Initialize
