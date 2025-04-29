@@ -79,6 +79,7 @@ app.get('/proxy', async (req, res) => {
       'Takedown time',
       'Setup and takedown time',
       'Open',
+      'Not open',
       'Not available for rental'
     ];
 
