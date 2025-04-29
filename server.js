@@ -1,20 +1,21 @@
-// FINAL FINAL FINAL server.js (with 9:00PM fallback)
+// FINAL server.js with smart merge of identical names
 
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
-const timezone = require('dayjs/plugin/timezone');
-dayjs.extend(utc);
-dayjs.extend(timezone);
+require('dayjs/plugin/timezone');
+require('dayjs/plugin/utc');
+dayjs.extend(require('dayjs/plugin/utc'));
+dayjs.extend(require('dayjs/plugin/timezone'));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const TIMEZONE = 'America/New_York';
 
 app.use(cors());
+
+const TIMEZONE = 'America/New_York';
 
 app.get('/proxy', async (req, res) => {
   try {
@@ -30,76 +31,52 @@ app.get('/proxy', async (req, res) => {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
 
-    const raw = [];
+    const rawReservations = [];
 
-    // Step 1: Parse times and statuses
-    $('tr').each((_, el) => {
-      const timeText = $(el).find('td.court-time').text().trim();
-      const statusText = $(el).find('td').eq(1).text().trim();
-
-      if (isValidTime(timeText)) {
-        raw.push({
-          startTime: timeText,
-          status: statusText || timeText
+    // Extract times and statuses
+    $('.calendar_holder .calendar_cell').each((_, el) => {
+      const timeText = $(el).find('.time').text().trim();
+      const reservationText = $(el).find('.reservation').text().trim();
+      if (timeText) {
+        rawReservations.push({
+          startTime: formatTime(timeText),
+          status: reservationText || timeText // fallback if no reservation text
         });
       }
     });
 
-    // Step 2: Remove placeholders (status = startTime)
-    const filtered = raw.filter(r => r.status !== r.startTime);
+    // Step 1: Remove placeholders (status == startTime)
+    const filtered = rawReservations.filter(r => r.status !== r.startTime);
 
-    // Step 3: Merge consecutive identical events
+    // Step 2: Clean status (remove "Member Event" etc.)
+    const cleaned = filtered.map(r => ({
+      startTime: r.startTime,
+      status: cleanStatus(r.status)
+    })).filter(r => r.status && !shouldIgnoreStatus(r.status));
+
+    // Step 3: Set end times (next event's startTime or 9:00PM)
+    for (let i = 0; i < cleaned.length; i++) {
+      if (i + 1 < cleaned.length) {
+        cleaned[i].endTime = cleaned[i + 1].startTime;
+      } else {
+        cleaned[i].endTime = '9:00PM';
+      }
+    }
+
+    // Step 4: Smart merge same-name events
     const merged = [];
-    let i = 0;
-    while (i < filtered.length) {
-      const current = { ...filtered[i] };
-      let j = i + 1;
-
-      while (
-        j < filtered.length &&
-        normalizeStatus(filtered[j].status) === normalizeStatus(current.status)
-      ) {
-        j++;
+    cleaned.forEach(res => {
+      const last = merged[merged.length - 1];
+      if (last && last.status === res.status) {
+        // Extend last reservation
+        last.endTime = res.endTime;
+      } else {
+        merged.push({ ...res });
       }
+    });
 
-      current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
-      merged.push(current);
-      i = j;
-    }
-
-    // Step 4: Adjust end times based on timeline
-    for (let k = 0; k < merged.length - 1; k++) {
-      merged[k].endTime = merged[k + 1].startTime;
-    }
-
-    // Step 5: Clean statuses and filter unwanted events
-    const ignoreStatuses = [
-      'Setup time',
-      'Takedown time',
-      'Setup and takedown time',
-      'Open',
-      'Not open',
-      'Not available for rental'
-    ];
-
-    const cleaned = merged
-      .map(r => ({
-        startTime: r.startTime,
-        endTime: r.endTime,
-        status: cleanStatus(r.status)
-      }))
-      .filter(r => r.status && !ignoreStatuses.includes(r.status));
-
-    // Step 6: Handle the last event fallback to 9:00PM
-    if (cleaned.length > 0) {
-      const last = cleaned[cleaned.length - 1];
-      if (!last.endTime || last.endTime === last.startTime) {
-        last.endTime = '9:00PM';
-      }
-    }
-
-    console.table(cleaned);
-    res.json({ reservations: cleaned });
+    console.table(merged);
+    res.json({ reservations: merged });
 
   } catch (error) {
     console.error('Error fetching data from yourcourts.com:', error.message);
@@ -107,24 +84,19 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-function isValidTime(str) {
-  return /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)$/i.test(str);
+function formatTime(timeStr) {
+  return dayjs(timeStr, ['h:mmA', 'h:mm A']).format('h:mmA');
 }
 
 function cleanStatus(status) {
-  // Remove leading time range like "11:30AM - 1:30PM"
-  status = status.replace(/^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i, '');
-
-  // Remove "Member Event"
-  status = status.replace(/Member Event/gi, '');
-
-  return status.trim();
+  return status.replace(/Member Event/gi, '').trim();
 }
 
-function normalizeStatus(status) {
-  return cleanStatus(status).toLowerCase();
+function shouldIgnoreStatus(status) {
+  const ignore = ['Setup time', 'Takedown time', 'Open', 'Not available for rental', 'Not open'];
+  return ignore.includes(status);
 }
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
