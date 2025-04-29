@@ -1,4 +1,4 @@
-// FINAL corrected server.js
+// FINAL FINAL server.js
 
 const express = require('express');
 const cors = require('cors');
@@ -30,58 +30,67 @@ app.get('/proxy', async (req, res) => {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
 
-    const rawReservations = [];
+    const raw = [];
 
-    // Correct scraping: only pick rows that have a valid time
+    // Step 1: Parse times and statuses
     $('tr').each((_, el) => {
       const timeText = $(el).find('td.court-time').text().trim();
       const statusText = $(el).find('td').eq(1).text().trim();
 
       if (isValidTime(timeText)) {
-        rawReservations.push({
+        raw.push({
           startTime: timeText,
           status: statusText || timeText
         });
       }
     });
 
-    // Step 1: Remove placeholders (status = startTime)
-    const filtered = rawReservations.filter(r => r.status !== r.startTime);
+    // Step 2: Remove placeholders (status == startTime)
+    const filtered = raw.filter(r => r.status !== r.startTime);
 
-    // Step 2: Merge identical consecutive events
+    // Step 3: Merge consecutive identical events, including setup/takedown in the timeline
     const merged = [];
     let i = 0;
     while (i < filtered.length) {
       const current = { ...filtered[i] };
       let j = i + 1;
 
-      while (j < filtered.length && normalizeStatus(filtered[j].status) === normalizeStatus(current.status)) {
+      while (
+        j < filtered.length &&
+        normalizeStatus(filtered[j].status) === normalizeStatus(current.status)
+      ) {
         j++;
       }
 
+      // Use the next time slot (whether setup or not) as the end time
       current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
       merged.push(current);
       i = j;
     }
 
-    // Step 3: Remove unwanted statuses and clean "Member Event"
-    const ignoreStatuses = ['Setup time', 'Takedown time', 'Open', 'Not available for rental'];
-    const cleaned = merged.map(r => ({
-      startTime: r.startTime,
-      endTime: r.endTime,
-      status: cleanStatus(r.status)
-    })).filter(r => r.status && !ignoreStatuses.includes(r.status));
+    // Step 4: Adjust end times based on full timeline (including ignored entries)
+    for (let k = 0; k < merged.length - 1; k++) {
+      merged[k].endTime = merged[k + 1].startTime;
+    }
 
-    // Step 4: Adjust end times again if needed
-    for (let k = 0; k < cleaned.length - 1; k++) {
-      cleaned[k].endTime = cleaned[k + 1].startTime;
-    }
-    if (cleaned.length > 0 && !cleaned[cleaned.length - 1].endTime) {
-      cleaned[cleaned.length - 1].endTime = cleaned[cleaned.length - 1].startTime;
-    }
+    // Step 5: Remove unwanted statuses (output only)
+    const ignoreStatuses = [
+      'Setup time',
+      'Takedown time',
+      'Setup and takedown time',
+      'Open',
+      'Not available for rental'
+    ];
+
+    const cleaned = merged
+      .map(r => ({
+        startTime: r.startTime,
+        endTime: r.endTime,
+        status: cleanStatus(r.status)
+      }))
+      .filter(r => r.status && !ignoreStatuses.includes(r.status));
 
     console.table(cleaned);
-
     res.json({ reservations: cleaned });
 
   } catch (error) {
