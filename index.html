@@ -1,17 +1,19 @@
-<!-- Version 19 -->
+<!-- Version 20 FINAL -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v19)</title>
+  <title>Wildwood Manor Pool Pavilion (v20)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/customParseFormat.min.js"></script>
   <script>
     dayjs.extend(dayjs_plugin_utc);
     dayjs.extend(dayjs_plugin_timezone);
+    dayjs.extend(dayjs_plugin_customParseFormat);
   </script>
 
   <style>
@@ -134,12 +136,12 @@ async function loadReservations(retry = false) {
     let now;
 
     if (reservationDateStr && timeOverrideStr) {
-      const fullTimeStr = `${reservationDateStr} ${timeOverrideStr}`;
-      now = dayjs.tz(fullTimeStr, 'M/D/YYYY h:mmA', 'America/New_York');
-
-      if (!now.isValid()) {
-        console.error('Invalid timeOverrideStr:', timeOverrideStr);
-        now = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York').hour(0).minute(0);
+      const localParse = dayjs(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA');
+      if (localParse.isValid()) {
+        now = localParse.tz('America/New_York');
+      } else {
+        console.error('Invalid datetime override format!');
+        now = baseDate.startOf('day');
       }
     } else {
       now = dayjs().tz('America/New_York');
@@ -155,8 +157,8 @@ async function loadReservations(retry = false) {
 
     function parseFullDateTime(dateStr, timeStr) {
       if (!dateStr || !timeStr) return null;
-      const dt = dayjs.tz(`${dateStr} ${timeStr}`, 'M/D/YYYY h:mmA', 'America/New_York');
-      return dt.isValid() ? dt : null;
+      const dt = dayjs(`${dateStr} ${timeStr}`, 'M/D/YYYY h:mmA');
+      return dt.isValid() ? dt.tz('America/New_York') : null;
     }
 
     const fullReservations = reservations
