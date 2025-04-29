@@ -1,0 +1,39 @@
+<!-- TEST FETCH -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fetch Test</title>
+</head>
+<body>
+
+<h1>Fetch Test Page</h1>
+<pre id="output">Loading...</pre>
+
+<script>
+async function testFetch() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const reservationDateStr = urlParams.get('reservationDate');
+  const facility_id = 2103;
+  const court_id = 15094;
+
+  const fetchUrl = `https://pavilion.onrender.com/proxy?${reservationDateStr ? `reservationDate=${encodeURIComponent(reservationDateStr)}&` : ''}facility_id=${facility_id}&court_id=${court_id}`;
+
+  document.getElementById('output').innerText = `Fetching: ${fetchUrl}...\n`;
+
+  try {
+    const response = await fetch(fetchUrl);
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+    const data = await response.json();
+    document.getElementById('output').innerText += JSON.stringify(data, null, 2);
+  } catch (error) {
+    document.getElementById('output').innerText += `\nERROR: ${error.message}`;
+  }
+}
+
+testFetch();
+</script>
+
+</body>
+</html>
