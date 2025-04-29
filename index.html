@@ -1,10 +1,10 @@
-<!-- Version 17 -->
+<!-- Version 18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v17)</title>
+  <title>Wildwood Manor Pool Pavilion (v18)</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
@@ -133,11 +133,10 @@ async function loadReservations(retry = false) {
 
     let now;
     if (reservationDateStr && timeOverrideStr) {
-      const tryNow = dayjs.tz(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA', 'America/New_York');
-      if (!tryNow.isValid()) {
+      now = dayjs.tz(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA', 'America/New_York');
+      if (!now.isValid()) {
         throw new Error(`Invalid time override: "${timeOverrideStr}"`);
       }
-      now = tryNow;
     } else {
       now = dayjs().tz('America/New_York');
     }
@@ -150,22 +149,16 @@ async function loadReservations(retry = false) {
       return;
     }
 
-    function parseTime(base, timeStr) {
-      const match = timeStr.match(/^(\d{1,2}):(\d{2})(AM|PM)$/i);
-      if (!match) return null;
-      let hour = parseInt(match[1], 10);
-      const minute = parseInt(match[2], 10);
-      const ampm = match[3].toUpperCase();
-      if (ampm === "PM" && hour !== 12) hour += 12;
-      if (ampm === "AM" && hour === 12) hour = 0;
-      return base.clone().hour(hour).minute(minute).second(0);
+    function parseFullDateTime(dateStr, timeStr) {
+      if (!dateStr || !timeStr) return null;
+      return dayjs.tz(`${dateStr} ${timeStr}`, 'M/D/YYYY h:mmA', 'America/New_York');
     }
 
     const fullReservations = reservations
       .map(r => {
-        const start = parseTime(baseDate, r.startTime);
-        const end = parseTime(baseDate, r.endTime);
-        if (!start || !end) {
+        const start = parseFullDateTime(reservationDateStr, r.startTime);
+        const end = parseFullDateTime(reservationDateStr, r.endTime);
+        if (!start || !end || !start.isValid() || !end.isValid()) {
           console.warn('Skipping invalid reservation:', r);
           return null;
         }
