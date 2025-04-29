@@ -1,4 +1,4 @@
-// FINAL FINAL server.js
+// FINAL FINAL server.js (strips times from status descriptions)
 
 const express = require('express');
 const cors = require('cors');
@@ -45,10 +45,10 @@ app.get('/proxy', async (req, res) => {
       }
     });
 
-    // Step 2: Remove placeholders (status == startTime)
+    // Step 2: Remove placeholders (status = startTime)
     const filtered = raw.filter(r => r.status !== r.startTime);
 
-    // Step 3: Merge consecutive identical events, including setup/takedown in the timeline
+    // Step 3: Merge consecutive identical events, including setup/takedown in timeline
     const merged = [];
     let i = 0;
     while (i < filtered.length) {
@@ -62,18 +62,18 @@ app.get('/proxy', async (req, res) => {
         j++;
       }
 
-      // Use the next time slot (whether setup or not) as the end time
+      // Use the next real event's start time as end time
       current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
       merged.push(current);
       i = j;
     }
 
-    // Step 4: Adjust end times based on full timeline (including ignored entries)
+    // Step 4: Adjust end times based on full timeline
     for (let k = 0; k < merged.length - 1; k++) {
       merged[k].endTime = merged[k + 1].startTime;
     }
 
-    // Step 5: Remove unwanted statuses (output only)
+    // Step 5: Clean statuses and filter unwanted events
     const ignoreStatuses = [
       'Setup time',
       'Takedown time',
@@ -104,7 +104,13 @@ function isValidTime(str) {
 }
 
 function cleanStatus(status) {
-  return status.replace(/Member Event/gi, '').trim();
+  // Remove leading time range like "11:30AM - 1:30PM"
+  status = status.replace(/^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i, '');
+  
+  // Remove "Member Event"
+  status = status.replace(/Member Event/gi, '');
+
+  return status.trim();
 }
 
 function normalizeStatus(status) {
