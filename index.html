@@ -33,7 +33,7 @@ async function loadReservations(retry = false) {
     const facility_id = 2103;
     const court_id = 15094;
 
-    // ✅ Fix: Always use Eastern Time's date if reservationDate is missing
+    // Fix: Always use Eastern Time's date if reservationDate is missing
     const todayEastern = dayjs().tz('America/New_York');
     if (!reservationDateStr) {
       reservationDateStr = todayEastern.format('M/D/YYYY');
