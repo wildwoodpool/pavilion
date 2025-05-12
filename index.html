@@ -3,16 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v26.2)</title>
+  <title>Wildwood Manor Pool Pavilion (v26.3)</title>
 
+  <!-- Day.js core + plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/customParseFormat.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/isSameOrAfter.min.js"></script>
   <script>
     dayjs.extend(dayjs_plugin_utc);
     dayjs.extend(dayjs_plugin_timezone);
     dayjs.extend(dayjs_plugin_customParseFormat);
+    dayjs.extend(dayjs_plugin_isSameOrAfter);
   </script>
 
   <style>
@@ -142,7 +145,7 @@ async function loadReservations() {
     const data = await response.json();
 
     const serverTimeStr = data.serverTime;
-    const serverTime = dayjs.tz(serverTimeStr, 'America/New_York');
+    const serverTime = dayjs(serverTimeStr); // ← ISO string includes TZ
     let reservationDateStr = urlParams.get('reservationDate') || serverTime.format('M/D/YYYY');
     const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
 
