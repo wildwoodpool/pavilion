@@ -151,18 +151,15 @@ async function loadReservations(retry = false) {
     const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
     let now;
 
-    const serverTimeStr = data.serverTime;
-    let now;
-
     if (timeOverrideStr) {
       const localParse = dayjs(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA');
       if (localParse.isValid()) {
         now = localParse.tz('America/New_York');
       } else {
-        now = dayjs.tz(serverTimeStr, 'America/New_York');
+        now = baseDate.startOf('day');
       }
     } else {
-      now = dayjs.tz(serverTimeStr, 'America/New_York');
+      now = dayjs().tz('America/New_York');
     }
 
     document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
