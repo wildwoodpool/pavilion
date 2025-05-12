@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v26)</title>
+  <title>Wildwood Manor Pool Pavilion (v26.1)</title>
 
-  <!-- Day.js + plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
@@ -133,10 +132,14 @@
 async function loadReservations(retry = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    const reservationDateStr = urlParams.get('reservationDate');
+    let reservationDateStr = urlParams.get('reservationDate');
     const timeOverrideStr = urlParams.get('time');
     const facility_id = 2103;
     const court_id = 15094;
+
+    if (!reservationDateStr) {
+      reservationDateStr = dayjs().tz('America/New_York').format('M/D/YYYY');
+    }
 
     const fetchUrl = `https://pavilion.onrender.com/proxy?reservationDate=${encodeURIComponent(reservationDateStr)}&facility_id=${facility_id}&court_id=${court_id}`;
 
@@ -145,7 +148,6 @@ async function loadReservations(retry = false) {
     const data = await response.json();
 
     const reservations = data.reservations || [];
-
     const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
     let now;
 
