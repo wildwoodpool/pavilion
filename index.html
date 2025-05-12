@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v27b)</title>
+  <title>Wildwood Manor Pool Pavilion (v26)</title>
 
   <!-- Day.js + plugins -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
@@ -133,16 +133,10 @@
 async function loadReservations(retry = false) {
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    let reservationDateStr = urlParams.get('reservationDate');
+    const reservationDateStr = urlParams.get('reservationDate');
     const timeOverrideStr = urlParams.get('time');
     const facility_id = 2103;
     const court_id = 15094;
-
-    // Fix: always use Eastern Time's date when missing
-    const easternNow = dayjs().tz('America/New_York');
-    if (!reservationDateStr) {
-      reservationDateStr = easternNow.format('M/D/YYYY');
-    }
 
     const fetchUrl = `https://pavilion.onrender.com/proxy?reservationDate=${encodeURIComponent(reservationDateStr)}&facility_id=${facility_id}&court_id=${court_id}`;
 
@@ -151,9 +145,10 @@ async function loadReservations(retry = false) {
     const data = await response.json();
 
     const reservations = data.reservations || [];
-    const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
 
+    const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
     let now;
+
     if (timeOverrideStr) {
       const localParse = dayjs(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA');
       if (localParse.isValid()) {
@@ -162,7 +157,7 @@ async function loadReservations(retry = false) {
         now = baseDate.startOf('day');
       }
     } else {
-      now = easternNow;
+      now = dayjs().tz('America/New_York');
     }
 
     document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
