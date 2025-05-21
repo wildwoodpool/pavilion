@@ -99,8 +99,7 @@ app.get('/proxy', async (req, res) => {
     }
 
     console.table(cleaned);
-    const serverTime = dayjs().tz(TIMEZONE).format();
-    res.json({ serverTime, reservations: cleaned });
+    res.json({ reservations: cleaned });
 
   } catch (error) {
     console.error('Error fetching data from yourcourts.com:', error.message);
