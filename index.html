@@ -2,223 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Wildwood Manor Pool Pavilion (v26.3)</title>
-
-  <!-- Day.js core + plugins -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/dayjs.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/utc.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/timezone.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/customParseFormat.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.9/plugin/isSameOrAfter.min.js"></script>
+  <title>Pavilion Reservations</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Day.js Core and Plugins -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isSameOrAfter.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/customParseFormat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/timezone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
   <script>
-    dayjs.extend(dayjs_plugin_utc);
-    dayjs.extend(dayjs_plugin_timezone);
-    dayjs.extend(dayjs_plugin_customParseFormat);
-    dayjs.extend(dayjs_plugin_isSameOrAfter);
+    dayjs.extend(window.dayjs_plugin_isSameOrAfter);
+    dayjs.extend(window.dayjs_plugin_customParseFormat);
+    dayjs.extend(window.dayjs_plugin_timezone);
+    dayjs.extend(window.dayjs_plugin_utc);
   </script>
-
   <style>
     body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #112e46;
+      font-family: sans-serif;
+      margin: 2em;
+      background: #f9f9f9;
+      color: #333;
     }
-
-    .header {
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1vw;
+    #status {
+      font-size: 1.2em;
+      margin-bottom: 1em;
     }
-
-    .header img {
-      height: 8vw;
-      max-height: 80px;
-      margin-right: 1vw;
+    .reservation {
+      padding: 0.5em 0;
+      border-bottom: 1px solid #ccc;
     }
-
-    .header-text {
-      font-size: 5vw;
-      font-weight: bold;
-      color: black;
-      white-space: nowrap;
-    }
-
-    .main-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 2vw;
-    }
-
-    .date-time-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      width: 90%;
-      margin: 2vh 0;
-    }
-
-    .date-heading {
-      color: white;
-      font-size: 4vw;
-      white-space: nowrap;
-    }
-
-    .current-time-box {
-      border: 2px solid white;
-      border-radius: 10px;
-      padding: 0.5vw 1.5vw;
-      color: white;
-      background-color: #112e46;
-      text-align: center;
-    }
-
-    .current-time-label {
-      font-size: 1.8vw;
-      opacity: 0.8;
-    }
-
-    .current-time-value {
-      font-size: 3vw;
-      font-weight: bold;
-    }
-
-    .reservation-list {
-      width: 90%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-
-    .reservation-box {
-      background: #5783c8;
-      border: 2px solid black;
-      border-radius: 12px;
-      padding: 2vw;
-      margin: 2vh 0;
-      font-size: clamp(14px, 4vw, 30px);
-      width: 100%;
-      color: white;
-      box-sizing: border-box;
-      text-align: center;
-      font-weight: normal;
-    }
-
-    .current-reservation {
-      font-weight: bold;
-      background: #2f5597;
+    .reservation strong {
+      display: inline-block;
+      width: 8em;
     }
   </style>
 </head>
-
 <body>
-<div class="header">
-  <img src="wildwood-manor.png" alt="Wildwood Manor Logo">
-  <div class="header-text">Wildwood Manor Pool Pavilion</div>
-</div>
+  <div id="status">Loading date...</div>
+  <div id="reservations"></div>
 
-<div class="main-content">
-  <div class="date-time-line">
-    <div class="date-heading" id="date-heading">Loading date...</div>
-    <div class="current-time-box">
-      <div class="current-time-label">Current time</div>
-      <div class="current-time-value" id="current-time">--:--</div>
-    </div>
-  </div>
-  <div class="reservation-list" id="output">Loading...</div>
-</div>
+  <script>
+    async function loadReservations() {
+      const statusEl = document.getElementById("status");
+      const reservationsEl = document.getElementById("reservations");
+      statusEl.textContent = "Loading date...";
 
-<script>
-async function loadReservations() {
-  try {
-    const urlParams = new URLSearchParams(window.location.search);
-    const timeOverrideStr = urlParams.get('time');
-    const facility_id = 2103;
-    const court_id = 15094;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const reservationDateStr = urlParams.get("reservationDate");
+        const timeOverrideStr = urlParams.get("time");
 
-    const fetchUrl = `https://pavilion.onrender.com/proxy?reservationDate=${urlParams.get('reservationDate') || ''}&facility_id=${facility_id}&court_id=${court_id}`;
-    const response = await fetch(fetchUrl);
-    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-    const data = await response.json();
+        const apiUrl = "https://pavilion.onrender.com/proxy";
+        const queryParams = new URLSearchParams();
+        if (reservationDateStr) queryParams.set("reservationDate", reservationDateStr);
+        const response = await fetch(`${apiUrl}?${queryParams.toString()}`);
+        const data = await response.json();
 
-    const serverTimeStr = data.serverTime;
-    const serverTime = dayjs(serverTimeStr); // ← ISO string includes TZ
-    let reservationDateStr = urlParams.get('reservationDate') || serverTime.format('M/D/YYYY');
-    const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
+        const serverTimeStr = data.serverTime;
+        const serverTime = dayjs(serverTimeStr);
+        if (!serverTime.isValid()) throw new Error("Invalid serverTime");
 
-    let now;
-    if (timeOverrideStr) {
-      const parsed = dayjs(`${reservationDateStr} ${timeOverrideStr}`, 'M/D/YYYY h:mmA');
-      now = parsed.isValid() ? parsed.tz('America/New_York') : serverTime;
-    } else {
-      now = serverTime;
-    }
+        let now = serverTime;
+        if (reservationDateStr && timeOverrideStr) {
+          const parsed = dayjs(`${reservationDateStr} ${timeOverrideStr}`, "M/D/YYYY h:mmA");
+          if (parsed.isValid()) now = parsed;
+        }
 
-    document.getElementById('date-heading').innerText = baseDate.format('dddd, MMMM D, YYYY');
-    document.getElementById('current-time').innerText = now.format('h:mm A');
+        const reservations = data.reservations || [];
+        if (reservations.length === 0) {
+          statusEl.textContent = "No reservations found.";
+          reservationsEl.innerHTML = "";
+          return;
+        }
 
-    const reservations = data.reservations || [];
-    if (reservations.length === 0) {
-      document.getElementById('output').innerHTML = '<div class="reservation-box">No Pavilion reservations today.</div>';
-      return;
-    }
-
-    const fullReservations = reservations.map(r => {
-      const start = dayjs(`${reservationDateStr} ${r.startTime}`, 'M/D/YYYY h:mmA').tz('America/New_York');
-      const end = dayjs(`${reservationDateStr} ${r.endTime}`, 'M/D/YYYY h:mmA').tz('America/New_York');
-      return { ...r, startDateTime: start, endDateTime: end };
-    });
-
-    let current = null;
-    let next = null;
-    let later = [];
-
-    for (let i = 0; i < fullReservations.length; i++) {
-      const res = fullReservations[i];
-      if (!current && now.isSameOrAfter(res.startDateTime) && now.isBefore(res.endDateTime)) {
-        current = res;
-      } else if (!next && now.isBefore(res.startDateTime)) {
-        next = res;
-      } else if (next) {
-        later.push(res);
+        statusEl.textContent = `Reservations for ${now.format("dddd, MMMM D, YYYY")}`;
+        reservationsEl.innerHTML = reservations
+          .map(r => {
+            const start = r.startTime;
+            const end = r.endTime;
+            const status = r.status;
+            return `<div class="reservation"><strong>${start}–${end}</strong> ${status}</div>`;
+          })
+          .join("");
+      } catch (error) {
+        console.error("Error loading reservations:", error);
+        statusEl.textContent = "Error loading reservations.";
+        reservationsEl.innerHTML = "";
       }
     }
 
-    const outputEl = document.getElementById('output');
-    let html = "";
-
-    if (current) {
-      html += `<div class="reservation-box current-reservation">Current reservation: ${current.status} (${current.startDateTime.format('h:mmA')} - ${current.endDateTime.format('h:mmA')})</div>`;
-      if (next) html += `<div class="reservation-box">Next reservation: ${next.status} at ${next.startDateTime.format('h:mmA')}</div>`;
-      later.forEach(r => {
-        html += `<div class="reservation-box">Coming up later: ${r.status} at ${r.startDateTime.format('h:mmA')}</div>`;
-      });
-    } else if (next) {
-      html += `<div class="reservation-box">Next reservation: ${next.status} at ${next.startDateTime.format('h:mmA')}</div>`;
-      later.forEach(r => {
-        html += `<div class="reservation-box">Coming up later: ${r.status} at ${r.startDateTime.format('h:mmA')}</div>`;
-      });
-    } else {
-      html = '<div class="reservation-box">No more reservations today.</div>';
-    }
-
-    outputEl.innerHTML = html;
-
-  } catch (error) {
-    console.error('Error loading reservations:', error);
-    document.getElementById('output').innerHTML =
-      `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
-  }
-}
-
-async function loadReservations() {
-  // fetch and display reservations...
-  setTimeout(loadReservations, 60 * 1000);
-}
-</script>
-
+    document.addEventListener("DOMContentLoaded", () => {
+      loadReservations();
+      setInterval(loadReservations, 5 * 60 * 1000); // Refresh every 5 minutes
+    });
+  </script>
 </body>
 </html>
