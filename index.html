@@ -214,8 +214,10 @@ async function loadReservations() {
   }
 }
 
-loadReservations();
-setInterval(loadReservations, 10 * 60 * 1000);
+async function loadReservations() {
+  // fetch and display reservations...
+  setTimeout(loadReservations, 60 * 1000);
+}
 </script>
 
 </body>
