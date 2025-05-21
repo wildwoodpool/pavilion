@@ -91,10 +91,44 @@
       }
     }
 
+<<<<<<< HEAD
     document.addEventListener("DOMContentLoaded", () => {
       loadReservations();
       setInterval(loadReservations, 5 * 60 * 1000); // Refresh every 5 minutes
     });
   </script>
+=======
+    const outputEl = document.getElementById('output');
+    let html = "";
+
+    if (current) {
+      html += `<div class="reservation-box current-reservation">Current reservation: ${current.status} (${current.startDateTime.format('h:mmA')} - ${current.endDateTime.format('h:mmA')})</div>`;
+      if (next) html += `<div class="reservation-box">Next reservation: ${next.status} at ${next.startDateTime.format('h:mmA')}</div>`;
+      later.forEach(r => {
+        html += `<div class="reservation-box">Coming up later: ${r.status} at ${r.startDateTime.format('h:mmA')}</div>`;
+      });
+    } else if (next) {
+      html += `<div class="reservation-box">Next reservation: ${next.status} at ${next.startDateTime.format('h:mmA')}</div>`;
+      later.forEach(r => {
+        html += `<div class="reservation-box">Coming up later: ${r.status} at ${r.startDateTime.format('h:mmA')}</div>`;
+      });
+    } else {
+      html = '<div class="reservation-box">No more reservations today.</div>';
+    }
+
+    outputEl.innerHTML = html;
+
+  } catch (error) {
+    console.error('Error loading reservations:', error);
+    document.getElementById('output').innerHTML =
+      `<div class="reservation-box">Error loading reservations: ${error.message}</div>`;
+  }
+}
+
+loadReservations();
+setInterval(loadReservations, 5 * 60 * 1000);
+</script>
+
+>>>>>>> parent of 1756a74 (Update index.html)
 </body>
 </html>
