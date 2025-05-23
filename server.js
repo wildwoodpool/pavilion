@@ -1,17 +1,15 @@
-// server.js — Pavilion (2103) + Sport Court (2027)
+// FINAL FINAL FINAL server.js (with 9:00PM fallback and Sport-Court branch)
 
-const express           = require('express');
-const cors              = require('cors');
-const axios             = require('axios');
-const cheerio           = require('cheerio');
-const dayjs             = require('dayjs');
-const utc               = require('dayjs/plugin/utc');
-const timezone          = require('dayjs/plugin/timezone');
-const customParseFormat = require('dayjs/plugin/customParseFormat');
+const express     = require('express');
+const cors        = require('cors');
+const axios       = require('axios');
+const cheerio     = require('cheerio');
+const dayjs       = require('dayjs');
+const utc         = require('dayjs/plugin/utc');
+const timezone    = require('dayjs/plugin/timezone');
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
-dayjs.extend(customParseFormat);
 
 const app      = express();
 const PORT     = process.env.PORT || 3000;
@@ -23,40 +21,36 @@ app.get('/proxy', async (req, res) => {
   try {
     let { reservationDate, facility_id, court_id } = req.query;
 
-    // 1) default to today in Eastern if not provided
-    if (!reservationDate) {
-      reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
-    }
-
-    // 2) fetch the HTML
-    const url = `https://www.yourcourts.com/facility/viewer/8353821` +
-                `?facility_id=${facility_id}` +
-                `&court_id=${court_id}` +
-                `&reservationDate=${encodeURIComponent(reservationDate)}`;
-    console.log(`Fetching data from ${url}`);
-    const { data: html } = await axios.get(url);
-    const $ = cheerio.load(html);
-
-    // 3) dispatch based on facility_id
-    let reservations;
+    // 0) Branch by facility_id
     if (facility_id === '2103') {
-      // ——————— PAVILION PARSING (UNCHANGED) ———————
+      // ————————— EXISTING PAVILION PARSER (UNCHANGED) —————————
+      if (!reservationDate) {
+        reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
+      }
+
+      const url = 
+        `https://www.yourcourts.com/facility/viewer/8353821` +
+        `?facility_id=${facility_id}` +
+        `&court_id=${court_id}` +
+        `&reservationDate=${reservationDate}`;
+      console.log(`Fetching data from ${url}`);
+
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+
       const raw = [];
-      $('.calendar_holder .calendar_cell').each((_, el) => {
-        const timeText        = $(el).find('.time').text().trim();
-        const reservationText = $(el).find('.reservation').text().trim();
-        if (timeText) {
-          raw.push({
-            startTime: formatTime(timeText),
-            status:    reservationText || timeText
-          });
+      $('tr').each((_, el) => {
+        const timeText   = $(el).find('td.court-time').text().trim();
+        const statusText = $(el).find('td').eq(1).text().trim();
+        if (isValidTime(timeText)) {
+          raw.push({ startTime: timeText, status: statusText || timeText });
         }
       });
 
-      // Step 1: remove placeholders
+      // Step 2: Remove placeholders
       const filtered = raw.filter(r => r.status !== r.startTime);
 
-      // Step 2: merge consecutive identical
+      // Step 3: Merge consecutive identical
       const merged = [];
       let i = 0;
       while (i < filtered.length) {
@@ -68,21 +62,27 @@ app.get('/proxy', async (req, res) => {
         ) {
           j++;
         }
-        current.endTime = filtered[j]
-          ? filtered[j].startTime
-          : current.startTime;
+        current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
         merged.push(current);
         i = j;
       }
 
-      // Step 3: clean & filter
+      // Step 4: Adjust end times
+      for (let k = 0; k < merged.length - 1; k++) {
+        merged[k].endTime = merged[k + 1].startTime;
+      }
+
+      // Step 5: Clean and filter
       const ignoreStatuses = [
         'Setup time',
         'Takedown time',
+        'Setup and takedown time',
         'Open',
+        'Not open',
         'Not available for rental'
       ];
-      reservations = merged
+
+      const cleaned = merged
         .map(r => ({
           startTime: r.startTime,
           endTime:   r.endTime,
@@ -90,88 +90,130 @@ app.get('/proxy', async (req, res) => {
         }))
         .filter(r => r.status && !ignoreStatuses.includes(r.status));
 
-    } else if (facility_id === '2027') {
-      // ————— SPORT-COURT PARSING —————
-      const raw = [];
-      $('.calendar_holder .calendar_cell').each((_, el) => {
-        const timeText = $(el).find('.court-time').text().trim();
-        let desc       = $(el).find('.reservation').text().trim();
-        if (!timeText) return;
+      // Step 6: Last-event fallback
+      if (cleaned.length > 0) {
+        const last = cleaned[cleaned.length - 1];
+        if (!last.endTime || last.endTime === last.startTime) {
+          last.endTime = '9:00PM';
+        }
+      }
 
-        // fix missing space: "Vice PresidentPickleball" → "Vice President Pickleball"
-        desc = desc.replace(/([a-z])([A-Z])/g, '$1 $2');
+      console.table(cleaned);
+      return res.json({ reservations: cleaned });
+    }
 
-        const startTime = formatTime(timeText);
-        const ignore    = [
-          'Walk-up basketball only',
-          'Not available before 8am on weekends',
-          'Closed'
-        ];
+    else if (facility_id === '2027') {
+      // ————————— NEW SPORT-COURT PARSER —————————
+      // Exactly the same structure + 9:00PM fallback, but with its own ignore list
 
-        if (desc === startTime || ignore.includes(desc) || !desc) {
-          raw.push({ placeholder: true, startTime });
-        } else {
-          raw.push({ placeholder: false, startTime, status: desc });
+      if (!reservationDate) {
+        reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
+      }
+
+      const url = 
+        `https://www.yourcourts.com/facility/viewer/8353821` +
+        `?facility_id=${facility_id}` +
+        `&court_id=${court_id}` +
+        `&reservationDate=${reservationDate}`;
+      console.log(`Fetching sport-court data from ${url}`);
+
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+
+      const raw2 = [];
+      $('tr').each((_, el) => {
+        const timeText   = $(el).find('td.court-time').text().trim();
+        const statusText = $(el).find('td').eq(1).text().trim();
+        if (isValidTime(timeText)) {
+          raw2.push({ startTime: timeText, status: statusText || timeText });
         }
       });
 
-      // merge only the real reservations
-      const events = [];
-      let k = 0;
-      while (k < raw.length) {
-        if (raw[k].placeholder) { k++; continue; }
+      // Remove placeholders & unwanted
+      const ignoreSport = [
+        'Walk-up basketball only',
+        'Not available before 8am on weekends',
+        'Closed'
+      ];
+      const filtered2 = raw2.filter(r => 
+        r.status !== r.startTime &&
+        !ignoreSport.includes(r.status)
+      );
 
-        const { startTime, status } = raw[k];
-        let count = 1, j = k + 1;
+      // Merge consecutive identical
+      const merged2 = [];
+      let m = 0;
+      while (m < filtered2.length) {
+        const curr = { ...filtered2[m] };
+        let n = m + 1;
         while (
-          j < raw.length &&
-          !raw[j].placeholder &&
-          raw[j].status === status
+          n < filtered2.length &&
+          normalizeStatus(filtered2[n].status) === normalizeStatus(curr.status)
         ) {
-          count++;
-          j++;
+          n++;
         }
-
-        // compute endTime = start + 30min * count
-        const endTime = dayjs(startTime, 'h:mmA')
-          .add(count * 30, 'minute')
-          .format('h:mmA');
-
-        events.push({ startTime, endTime, status });
-        k = j;
+        curr.endTime = filtered2[n] ? filtered2[n].startTime : curr.startTime;
+        merged2.push(curr);
+        m = n;
       }
 
-      reservations = events;
-    } else {
+      // Adjust end times
+      for (let k2 = 0; k2 < merged2.length - 1; k2++) {
+        merged2[k2].endTime = merged2[k2 + 1].startTime;
+      }
+
+      // Clean statuses (no Member Event here, but safe)
+      const cleaned2 = merged2
+        .map(r => ({
+          startTime: r.startTime,
+          endTime:   r.endTime,
+          status:    cleanStatus(r.status)
+        }));
+
+      // Sport-court final fallback
+      if (cleaned2.length > 0) {
+        const last2 = cleaned2[cleaned2.length - 1];
+        if (!last2.endTime || last2.endTime === last2.startTime) {
+          last2.endTime = '9:00PM';
+        }
+      }
+
+      console.table(cleaned2);
+      return res.json({ reservations: cleaned2 });
+    }
+
+    else {
       return res
         .status(400)
         .json({ error: `Unsupported facility_id: ${facility_id}` });
     }
-
-    // 4) return
-    return res.json({ reservations });
-
-  } catch (err) {
-    console.error('Proxy error:', err.message);
-    return res.status(500).json({ error: 'Failed to fetch or parse data' });
+  } catch (error) {
+    console.error('Error fetching data from yourcourts.com:', error.message);
+    return res.status(500).json({ error: 'Failed to fetch data' });
   }
 });
 
-// ————————————————
-// Helpers
-// ————————————————
-function formatTime(str) {
-  return dayjs(str, ['h:mmA','h:mm a']).format('h:mmA');
+// ———————— Helpers ————————
+
+function isValidTime(str) {
+  return /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)$/i.test(str);
 }
 
-function cleanStatus(txt) {
-  return txt.replace(/Member Event/gi, '').trim();
+function cleanStatus(status) {
+  // Strip any leading time-range
+  status = status.replace(
+    /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i,
+    ''
+  );
+  // Remove "Member Event"
+  status = status.replace(/Member Event/gi, '');
+  return status.trim();
 }
 
-function normalizeStatus(txt) {
-  return cleanStatus(txt).toLowerCase();
+function normalizeStatus(status) {
+  return cleanStatus(status).toLowerCase();
 }
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
