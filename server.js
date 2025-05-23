@@ -1,5 +1,5 @@
 // server.js — Pavilion (2103) + Sport Court (2027)
-// Based on your “FINAL FINAL FINAL” baseline, with Sport-Court ignore updated to omit “Open”
+// Pavilion parsing left exactly as your “FINAL FINAL FINAL” version
 
 const express  = require('express');
 const cors     = require('cors');
@@ -22,13 +22,13 @@ app.get('/proxy', async (req, res) => {
   try {
     let { reservationDate, facility_id, court_id } = req.query;
 
-    // PAVILION BRANCH (UNCHANGED)
+    // ————— PAVILION BRANCH (UNCHANGED) —————
     if (facility_id === '2103') {
       if (!reservationDate) {
         reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
       }
 
-      const url =
+      const url = 
         `https://www.yourcourts.com/facility/viewer/8353821` +
         `?facility_id=${facility_id}` +
         `&court_id=${court_id}` +
@@ -47,7 +47,7 @@ app.get('/proxy', async (req, res) => {
         }
       });
 
-      // Step 2: Remove placeholders
+      // Step 2: Remove placeholders (status === startTime)
       const filtered = raw.filter(r => r.status !== r.startTime);
 
       // Step 3: Merge consecutive identical events
@@ -62,17 +62,19 @@ app.get('/proxy', async (req, res) => {
         ) {
           j++;
         }
-        current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
+        current.endTime = filtered[j]
+          ? filtered[j].startTime
+          : current.startTime;
         merged.push(current);
         i = j;
       }
 
-      // Step 4: Adjust end times
+      // Step 4: Shift endTimes to next start
       for (let k = 0; k < merged.length - 1; k++) {
         merged[k].endTime = merged[k + 1].startTime;
       }
 
-      // Step 5: Clean statuses and filter unwanted
+      // Step 5: Clean & filter unwanted statuses
       const ignoreStatuses = [
         'Setup time',
         'Takedown time',
@@ -89,8 +91,8 @@ app.get('/proxy', async (req, res) => {
         }))
         .filter(r => r.status && !ignoreStatuses.includes(r.status));
 
-      // Step 6: Last-event fallback to 9:00PM
-      if (cleaned.length > 0) {
+      // Step 6: Last-event fallback
+      if (cleaned.length) {
         const last = cleaned[cleaned.length - 1];
         if (!last.endTime || last.endTime === last.startTime) {
           last.endTime = '9:00PM';
@@ -101,7 +103,7 @@ app.get('/proxy', async (req, res) => {
       return res.json({ reservations: cleaned });
     }
 
-    // SPORT COURT BRANCH
+    // ————— SPORT COURT BRANCH (NEW) —————
     else if (facility_id === '2027') {
       if (!reservationDate) {
         reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
@@ -117,6 +119,7 @@ app.get('/proxy', async (req, res) => {
       const response = await axios.get(url);
       const $ = cheerio.load(response.data);
 
+      // 1) Extract raw rows
       const raw2 = [];
       $('tr').each((_, el) => {
         const timeText   = $(el).find('td.court-time').text().trim();
@@ -126,7 +129,7 @@ app.get('/proxy', async (req, res) => {
         }
       });
 
-      // Filter out placeholders & unwanted statuses (including "Open")
+      // 2) Omit placeholders & unwanted (plus “Open”)
       const ignoreSport = [
         'Walk-up basketball only',
         'Not available before 8am on weekends',
@@ -139,7 +142,7 @@ app.get('/proxy', async (req, res) => {
         return r.status !== r.startTime && !ignoreSport.includes(txt);
       });
 
-      // Merge consecutive identical events
+      // 3) Merge contiguous identical
       const merged2 = [];
       let m = 0;
       while (m < filtered2.length) {
@@ -151,34 +154,52 @@ app.get('/proxy', async (req, res) => {
         ) {
           n++;
         }
+        // endTime = next start or same
         curr.endTime = filtered2[n] ? filtered2[n].startTime : curr.startTime;
         merged2.push(curr);
         m = n;
       }
 
-      // Adjust end times
+      // 4) Shift endTimes forward
       for (let k2 = 0; k2 < merged2.length - 1; k2++) {
         merged2[k2].endTime = merged2[k2 + 1].startTime;
       }
 
-      // Final fallback to 9:00PM
-      if (merged2.length > 0) {
+      // 5) Final fallback to 9:00PM
+      if (merged2.length) {
         const last2 = merged2[merged2.length - 1];
         if (!last2.endTime || last2.endTime === last2.startTime) {
           last2.endTime = '9:00PM';
         }
       }
 
-      console.table(merged2);
-      return res.json({ reservations: merged2 });
+      // 6) Split status → person & sport
+      const reservations = merged2.map(r => {
+        // strip leading time-range & Member Event
+        const base = cleanStatus(r.status);
+        // split at the last uppercase sequence
+        const parts = base.match(/(.+?)([A-Z][a-zA-Z]*)$/) || [];
+        const person = (parts[1] || base).trim();
+        const sport  = (parts[2] || '').trim();
+        return {
+          startTime: r.startTime,
+          endTime:   r.endTime,
+          person,
+          sport
+        };
+      });
+
+      console.table(reservations);
+      return res.json({ reservations });
     }
 
-    // Unsupported facility_id
+    // ————— Unsupported facility_id —————
     else {
       return res
         .status(400)
         .json({ error: `Unsupported facility_id: ${facility_id}` });
     }
+
   } catch (error) {
     console.error('Error fetching data:', error.message);
     return res.status(500).json({ error: 'Failed to fetch data' });
@@ -193,7 +214,7 @@ function isValidTime(str) {
 }
 
 function cleanStatus(status) {
-  // Strip any leading time-range
+  // Strip leading time-range
   status = status.replace(
     /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i,
     ''
