@@ -60,55 +60,39 @@ app.get('/proxy', async (req, res) => {
 
 app.get('/today-events', async (req, res) => {
   try {
-    const calendarUrl = 'https://wildwoodpool.com/calendar/';
-    const today       = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
-    console.log(`\n--- Scraping events for ${today} from ${calendarUrl} ---\n`);
+    // 1) Compute today’s date in YYYY-MM-DD
+    const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
 
-    const { data: html } = await axios.get(calendarUrl);
-    const $ = cheerio.load(html);
+    // 2) Build the exact AJAX URL (only for today)
+    const feedUrl = [
+      'https://wildwoodpool.com/wp-admin/admin-ajax.php',
+      '?action=eventorganiser-fullcal',
+      `&start=${today}`,
+      `&end=${today}`,
+      '&timeformat=g%3Ai%20A',
+      '&users_events=false'
+    ].join('');
 
-    const reservations = [];
+    console.log(`Fetching calendar AJAX from ${feedUrl}`);
 
-    // 1) Iterate every fc-day-number cell and log its date
-    $('td.fc-day-number').each((_, td) => {
-      const $td     = $(td);
-      const cellDate = $td.attr('data-date');
-      console.log(`Inspecting cell for date: ${cellDate}`);
+    // 3) Fetch the feed
+    const { data: events } = await axios.get(feedUrl);
+    console.log(`Raw events payload:`, events);
 
-      // 2) Only process today’s cell for output, but log all cells
-      if (cellDate !== today) return;
-
-      // 3) From that cell’s table, find any events
-      const $table = $td.closest('table');
-      $table.find('td.fc-event-container a.fc-day-grid-event').each((_, a) => {
-        const $a    = $(a);
-        const title = $a.find('.fc-title').text().trim();
-
-        // Inline start time
-        let start = $a.find('.fc-time').text().trim();
-        let end   = start;
-
-        // Tooltip full range?
-        const tipId = $a.attr('data-hasqtip');
-        if (tipId) {
-          const tooltipText = $(`div[data-qtip-id="${tipId}"] .qtip-content`)
-                                .text().trim();
-          const m = tooltipText.match(
-            /(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/
-          );
-          if (m) { start = m[1]; end = m[2]; }
-        }
-
-        console.log(
-          `  → Found event on ${cellDate}: "${title}" ` +
-          `from ${start} to ${end}`
-        );
-
-        reservations.push({ title, startTime: start, endTime: end });
-      });
+    // 4) Map and format each event
+    const reservations = events.map(ev => {
+      // ev.start/ev.end are like "2025-05-24T10:00:00"
+      const s = dayjs(ev.start).tz(TIMEZONE).format('h:mmA');
+      const e = dayjs(ev.end  ).tz(TIMEZONE).format('h:mmA');
+      console.log(`  → ${ev.title}: ${s} – ${e}`);
+      return {
+        title:     ev.title,
+        startTime: s,
+        endTime:   e
+      };
     });
 
-    console.log(`\nTotal events for ${today}: ${reservations.length}\n`);
+    console.log(`Total events for ${today}: ${reservations.length}`);
     return res.json({ reservations });
 
   } catch (err) {
