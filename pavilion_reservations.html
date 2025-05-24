@@ -4,15 +4,17 @@
   <meta charset="UTF-8">
   <title>Today's Pavilion Reservations</title>
   <style>
-    /* Force panel width */
-    html, body, #wrapper {
+    html, body {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-      width: 384px !important;
-      overflow-x: hidden;
+      overflow: hidden;
+      height: 100%;
+      background: transparent;
     }
     #wrapper {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 384px;
       height: 100%;
       background-color: #022f6d;
       color: white;
@@ -23,7 +25,6 @@
       width: 75%;
       height: 1px;
       background-color: white;
-      border: none;
       margin: 4px auto;
     }
     .separator:first-of-type {
@@ -47,7 +48,7 @@
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
-      background-color: #174A8A; /* uniform light-blue */
+      background-color: #174A8A;
     }
     .person {
       font-size: 10px;
@@ -65,7 +66,7 @@
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
-      background-color: #022f6d; /* same as panel */
+      background-color: #022f6d;
     }
   </style>
 </head>
@@ -92,7 +93,7 @@
         const container = document.getElementById('reservations');
         container.innerHTML = '';
 
-        if (data.reservations && data.reservations.length > 0) {
+        if (data.reservations?.length) {
           data.reservations.forEach(r => {
             const box = document.createElement('div');
             box.className = 'reservation';
@@ -112,7 +113,6 @@
         console.error('Failed to load pavilion reservations', e);
       }
     }
-
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>

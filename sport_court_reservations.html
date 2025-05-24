@@ -4,15 +4,19 @@
   <meta charset="UTF-8">
   <title>Today's Sport Court Reservations</title>
   <style>
-    /* Force entire panel to exactly 384 px */
-    html, body, #wrapper {
+    /* reset and prevent any overflow */
+    html, body {
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-      width: 384px !important;
-      overflow-x: hidden;
+      overflow: hidden;
+      height: 100%;
+      background: transparent;
     }
+    /* wrapper will fill the zone exactly, but never exceed 384px */
     #wrapper {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 384px;
       height: 100%;
       background-color: #022f6d;
       color: white;
@@ -23,7 +27,6 @@
       width: 75%;
       height: 1px;
       background-color: white;
-      border: none;
       margin: 4px auto;
     }
     .separator:first-of-type {
@@ -48,19 +51,14 @@
       border-radius: 5px;
       padding: 3px;
     }
-    .basketball {
-      background-color: #174A8A;
-    }
-    .pickleball {
-      background-color: purple;
-    }
+    .basketball { background-color: #174A8A; }
+    .pickleball  { background-color: purple; }
     .person {
       font-size: 10px;
       font-weight: bold;
       margin-bottom: 1px;
     }
-    .sport,
-    .time {
+    .sport, .time {
       font-size: 8px;
       margin: 0;
       line-height: 1.2;
@@ -98,13 +96,11 @@
         const container = document.getElementById('reservations');
         container.innerHTML = '';
 
-        if (data.reservations && data.reservations.length > 0) {
+        if (data.reservations?.length) {
           data.reservations.forEach(r => {
             const box = document.createElement('div');
             box.className = 'reservation ' +
-              (r.sport.toLowerCase() === 'basketball'
-                ? 'basketball'
-                : 'pickleball');
+              (r.sport.toLowerCase() === 'basketball' ? 'basketball' : 'pickleball');
             box.innerHTML = `
               <div class="person">${r.person}</div>
               <div class="sport">${r.sport}</div>
@@ -122,7 +118,6 @@
         console.error('Failed to load reservations', e);
       }
     }
-
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
