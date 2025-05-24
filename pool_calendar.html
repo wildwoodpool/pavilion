@@ -5,32 +5,47 @@
   <title>Today's Pool Events</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    /* Force panel width exactly 384px */
+    /* Prevent clipping and match your other panels */
     html, body {
       margin: 0; padding: 0;
-      width: 384px; height: 100%;
+      width: 100%;  /* fill the zone */
+      height: 100%;
       overflow: hidden;
       background: transparent;
     }
     #wrapper {
       box-sizing: border-box;
-      width: 100%; height: 100%;
+      width: 100%;
+      max-width: 384px;
+      height: 100%;
       background-color: #022f6d;
       color: white;
       font-family: sans-serif;
       padding: 4px 6px;
     }
+    .separator {
+      width: 75%;
+      height: 1px;
+      background-color: white;
+      border: none;
+      margin: 4px auto;
+    }
+    .separator:first-of-type {
+      margin-top: 0;
+    }
     h2 {
       font-size: 12px;
       font-weight: bold;
       text-align: center;
-      margin: 0 0 4px;
+      margin: 0;
+      padding: 2px 0;
       line-height: 1.2;
     }
     .reservations {
       display: flex;
       flex-direction: column;
       gap: 3px;
+      margin-top: 3px;
     }
     .event, .no-event {
       box-sizing: border-box;
@@ -56,7 +71,9 @@
 </head>
 <body>
   <div id="wrapper">
+    <hr class="separator">
     <h2>Today's Pool<br>Events</h2>
+    <hr class="separator">
     <div id="list" class="reservations"></div>
   </div>
 
