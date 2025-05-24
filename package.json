@@ -27,6 +27,7 @@
     "luxon": "^3.6.1",
     "moment-timezone": "^0.5.48",
     "node-fetch": "^2.7.0",
-    "node-ical": "^0.20.1"
+    "node-ical": "^0.20.1",
+    "puppeteer": "^24.9.0"
   }
 }

@@ -8,6 +8,7 @@ const dayjs     = require('dayjs');
 const utc       = require('dayjs/plugin/utc');
 const timezone  = require('dayjs/plugin/timezone');
 const ical      = require('node-ical');  // ICS parser for pool calendar
+const puppeteer = require('puppeteer');
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -57,47 +58,58 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
-
-/**
- * New route: Today’s Pool Calendar events from ICS feed
- */
 app.get('/today-events', async (req, res) => {
+  let browser;
   try {
-    const icsUrl = 'https://wildwoodpool.com/feed/eo-events/?ical=1';
-    console.log(`Fetching pool calendar ICS from ${icsUrl}`);
+    // 1) Launch headless
+    browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
 
-    // Fetch and verify ICS
-    const { data: icsData } = await axios.get(icsUrl);
-    if (!icsData.includes('BEGIN:VCALENDAR')) {
-      throw new Error('Feed did not return ICS data');
-    }
-
-    // Parse the ICS
-    const parsed = ical.parseICS(icsData);
-    const todayDate = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
-
-    // Filter VEVENTs for today
-    const todaysEvents = Object.values(parsed)
-      .filter(evt => evt.type === 'VEVENT')
-      .filter(evt =>
-        dayjs(evt.start).tz(TIMEZONE).format('YYYY-MM-DD') === todayDate
-      );
-
-    // Map to your JSON shape
-    const reservations = todaysEvents.map(evt => {
-      const start = dayjs(evt.start).tz(TIMEZONE);
-      const end   = dayjs(evt.end).tz(TIMEZONE);
-      return {
-        startTime: start.format('h:mmA'),
-        endTime:   end.format('h:mmA'),
-        title:     evt.summary || ''
-      };
+    // 2) Go to the calendar page
+    await page.goto('https://wildwoodpool.com/calendar/', {
+      waitUntil: 'networkidle2',
+      timeout: 0
     });
 
+    // 3) Wait for the calendar JS to render your events (adjust selector as needed)
+    //    Here I’m assuming each event is in an element with class `.ms-event-title`
+    await page.waitForSelector('.ms-event-item', { timeout: 10000 });
+
+    // 4) Extract all events that have today’s date label
+    const today = new Date().toLocaleDateString('en-US', {
+      timeZone: 'America/New_York',
+      month: 'long',
+      day:   'numeric',
+      year:  'numeric'
+    }); // e.g. "May 24, 2025"
+
+    const reservations = await page.evaluate(today => {
+      const items = Array.from(document.querySelectorAll('.ms-event-item'));
+      return items
+        .filter(el => {
+          // The element that shows the date—adjust selector as needed
+          const dateEl = el.querySelector('.ms-event-date');
+          return dateEl && dateEl.textContent.trim() === today;
+        })
+        .map(el => {
+          const titleEl = el.querySelector('.ms-event-title');
+          const timeEl  = el.querySelector('.ms-event-time');
+          return {
+            title:     titleEl   ? titleEl.textContent.trim()   : '',
+            startTime: timeEl   ? timeEl.textContent.trim().split('–')[0].trim() : '',
+            endTime:   timeEl   ? timeEl.textContent.trim().split('–')[1].trim() : ''
+          };
+        });
+    }, today);
+
+    await browser.close();
     return res.json({ reservations });
 
-  } catch (error) {
-    console.error('Error fetching or parsing pool calendar:', error.message);
+  } catch (err) {
+    if (browser) await browser.close();
+    console.error('Error scraping pool calendar:', err);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
