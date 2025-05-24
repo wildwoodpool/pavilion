@@ -63,28 +63,36 @@ app.get('/proxy', async (req, res) => {
  */
 app.get('/today-events', async (req, res) => {
   try {
-    const icsUrl = 'https://wildwoodpool.com/calendar/?ical=1';
+    const icsUrl = 'https://wildwoodpool.com/feed/eo-events/?ical=1';
     console.log(`Fetching pool calendar ICS from ${icsUrl}`);
 
-    // Fetch and parse the ICS
+    // Fetch and verify ICS
     const { data: icsData } = await axios.get(icsUrl);
-    const parsed = ical.parseICS(icsData);
+    if (!icsData.includes('BEGIN:VCALENDAR')) {
+      throw new Error('Feed did not return ICS data');
+    }
 
+    // Parse the ICS
+    const parsed = ical.parseICS(icsData);
     const todayDate = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
 
-    // Extract VEVENT entries occurring today
-    const reservations = Object.values(parsed)
+    // Filter VEVENTs for today
+    const todaysEvents = Object.values(parsed)
       .filter(evt => evt.type === 'VEVENT')
-      .map(evt => {
-        const start = dayjs(evt.start).tz(TIMEZONE);
-        const end   = dayjs(evt.end).tz(TIMEZONE);
-        return {
-          startTime: start.format('h:mmA'),
-          endTime:   end.format('h:mmA'),
-          title:     evt.summary || ''
-        };
-      })
-      .filter(ev => dayjs(ev.startTime, 'h:mmA', TIMEZONE).tz(TIMEZONE).format('YYYY-MM-DD') === todayDate);
+      .filter(evt =>
+        dayjs(evt.start).tz(TIMEZONE).format('YYYY-MM-DD') === todayDate
+      );
+
+    // Map to your JSON shape
+    const reservations = todaysEvents.map(evt => {
+      const start = dayjs(evt.start).tz(TIMEZONE);
+      const end   = dayjs(evt.end).tz(TIMEZONE);
+      return {
+        startTime: start.format('h:mmA'),
+        endTime:   end.format('h:mmA'),
+        title:     evt.summary || ''
+      };
+    });
 
     return res.json({ reservations });
 
