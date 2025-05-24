@@ -61,81 +61,51 @@ app.get('/proxy', async (req, res) => {
 });
 
 
-/**
- * New route: Today’s Pool Calendar events from ICS feed
- */
 app.get('/today-events', async (req, res) => {
   try {
-    const icsUrl = 'https://wildwoodpool.com/feed/eo-events?ical=1';
-    console.log(`Fetching pool calendar ICS from ${icsUrl}`);
+    const icsUrl  = 'https://wildwoodpool.com/feed/eo-events?ical=1';
+    const todayUtc = dayjs().utc().format('YYYY-MM-DD');
+    console.log(`UTC today is ${todayUtc}, fetching ${icsUrl}`);
 
-    // Fetch the ICS feed
     const { data: icsData } = await axios.get(icsUrl);
     if (typeof icsData !== 'string' || !icsData.includes('BEGIN:VCALENDAR')) {
-      throw new Error('Invalid ICS data');
+      throw new Error('Invalid ICS');
     }
 
-    // Parse all components
     const parsed = ical.parseICS(icsData);
 
-    // Define today’s window in ET
-    const startOfDay = dayjs().tz(TIMEZONE).startOf('day').toDate();
-    const endOfDay   = dayjs().tz(TIMEZONE).endOf('day').toDate();
+    // Collect all VEVENTs, regardless of recurrence
+    const events = Object.values(parsed)
+      .filter(e => e.type === 'VEVENT')
+      .map(e => {
+        const d = dayjs(e.start).utc().format('YYYY-MM-DD');
+        console.log(`  Found event ${e.summary} on ${d}`);
+        return { start: e.start, end: e.end, summary: e.summary, date: d };
+      });
 
-    const occurrences = [];
+    // Filter for those whose UTC date matches
+    const todays = events.filter(ev => ev.date === todayUtc);
 
-    // Iterate through VEVENTs
-    for (const evt of Object.values(parsed)) {
-      if (evt.type !== 'VEVENT') continue;
+    console.log(`Returning ${todays.length} events for UTC today ${todayUtc}`);
 
-      // Single-instance event
-      if (!evt.rrule) {
-        const evStart = dayjs(evt.start).tz(TIMEZONE).toDate();
-        if (evStart >= startOfDay && evStart <= endOfDay) {
-          occurrences.push({
-            start: evStart,
-            end:   dayjs(evt.end).tz(TIMEZONE).toDate(),
-            summary: evt.summary || ''
-          });
-        }
-      } else {
-        // Recurring event: expand occurrences for today
-        const between = evt.rrule.between(startOfDay, endOfDay, true);
-        between.forEach(dt => {
-          // Skip exceptions
-          const exDates = evt.exdate || {};
-          if (exDates[dt.toISOString().substr(0,10)]) return;
-
-          // Compute end by duration
-          const durationMs = evt.end.getTime() - evt.start.getTime();
-          occurrences.push({
-            start: dt,
-            end:   new Date(dt.getTime() + durationMs),
-            summary: evt.summary || ''
-          });
-        });
-      }
-    }
-
-    // Map to JSON shape
-    const reservations = occurrences.map(o => {
-      const s = dayjs(o.start).tz(TIMEZONE);
-      const e = dayjs(o.end).tz(TIMEZONE);
+    // Map to your JSON shape
+    const reservations = todays.map(ev => {
+      const s = dayjs(ev.start).tz(TIMEZONE);
+      const e = dayjs(ev.end).tz(TIMEZONE);
       return {
         startTime: s.format('h:mmA'),
         endTime:   e.format('h:mmA'),
-        title:     o.summary
+        title:     ev.summary
       };
     });
 
     return res.json({ reservations });
 
-  } catch (error) {
-    console.error('Error fetching or parsing pool calendar:', error.message);
+  } catch (err) {
+    console.error('Error in /today-events:', err.message);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
-
 
 // ────────────────────────────────────────────────────────────────────────────
 // Pavilion parser (facility_id = 2103)
