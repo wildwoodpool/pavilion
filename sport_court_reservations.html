@@ -8,7 +8,7 @@
       background-color: #022f6d;
       color: white;
       margin: 0;
-      padding: 8px;
+      padding: 4px 8px;
       font-family: sans-serif;
       box-sizing: border-box;
       width: 384px;
@@ -18,7 +18,10 @@
       height: 1px;
       background-color: white;
       border: none;
-      margin: 6px auto;
+      margin: 4px auto;
+    }
+    .separator:first-of-type {
+      margin-top: 0;
     }
     .header {
       text-align: center;
@@ -31,8 +34,8 @@
     .reservations {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-top: 6px;
+      gap: 4px;
+      margin-top: 4px;
     }
     .reservation {
       border: 1px solid white;
@@ -54,10 +57,12 @@
     .person {
       font-size: 14px;
       font-weight: bold;
+      margin-bottom: 2px;
     }
     .sport,
     .time {
       font-size: 12px;
+      margin: 0;
     }
   </style>
 </head>
@@ -71,7 +76,6 @@
   <div id="reservations" class="reservations">
     <!-- Reservations will be injected here -->
   </div>
-  <hr class="separator">
   <script>
     async function loadReservations() {
       try {
