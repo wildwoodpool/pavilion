@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Today's Pool Calendar</title>
+  <script src="https://cdn.jsdelivr.net/npm/ical@1.4.0/build/ical.min.js"></script>
+  <style>
+    html, body {
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background: #022f6d; color: white; font-family: sans-serif;
+    }
+    #wrapper {
+      box-sizing: border-box; width: 100%; height: 100%;
+      padding: 4px 6px;
+    }
+    .header {
+      text-align: center; font-weight: bold; font-size: 12px;
+      line-height: 1.2; margin: 0 0 4px;
+    }
+    .separator {
+      width: 75%; height: 1px; background: white;
+      border: none; margin: 2px auto 4px;
+    }
+    .events {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .event, .no-event {
+      border: 1px solid white; border-radius: 5px; padding: 3px;
+      box-sizing: border-box;
+    }
+    .no-event { text-align: center; }
+    .title { font-size: 10px; font-weight: bold; margin-bottom: 1px; }
+    .time  { font-size: 8px; margin: 0; line-height: 1.2; }
+  </style>
+</head>
+<body>
+  <div id="wrapper">
+    <div class="header">Today's Pool<br>Events</div>
+    <hr class="separator">
+    <div id="events" class="events"></div>
+  </div>
+
+  <script>
+    (async function() {
+      const url = 'https://wildwoodpool.com/feed/eo-events/';
+      try {
+        const txt = await fetch(url).then(r => r.text());
+        const jcal = ICAL.parse(txt);
+        const comp = new ICAL.Component(jcal);
+        const vevents = comp.getAllSubcomponents('vevent')
+                            .map(c => new ICAL.Event(c));
+        const today = new Date().toDateString();
+
+        const todays = vevents.filter(ev =>
+          ev.startDate.toJSDate().toDateString() === today
+        );
+
+        const container = document.getElementById('events');
+        if (todays.length === 0) {
+          const no = document.createElement('div');
+          no.className = 'no-event';
+          no.textContent = 'No events today';
+          container.appendChild(no);
+        } else {
+          todays.forEach(ev => {
+            const box = document.createElement('div');
+            box.className = 'event';
+            const start = ev.startDate.toJSDate()
+                          .toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+            const end   = ev.endDate.toJSDate()
+                          .toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+            box.innerHTML = `
+              <div class="title">${ev.summary}</div>
+              <div class="time">${start} – ${end}</div>
+            `;
+            container.appendChild(box);
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load calendar:', e);
+      }
+    })();
+  </script>
+</body>
+</html>
