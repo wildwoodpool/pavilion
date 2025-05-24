@@ -58,43 +58,72 @@ app.get('/proxy', async (req, res) => {
 });
 
 
-/**
- * New route: Today’s Pool Calendar events by scraping the public HTML calendar
- */
 app.get('/today-events', async (req, res) => {
   try {
     const calendarUrl = 'https://wildwoodpool.com/calendar/';
-    console.log(`Scraping pool calendar HTML from ${calendarUrl}`);
+    console.log(`Scraping HTML from ${calendarUrl}`);
 
-    // 1) Fetch the calendar page
+    // 1) Fetch the page
     const { data: html } = await axios.get(calendarUrl);
     const $ = cheerio.load(html);
 
-    // 2) Build today's date string as shown on the calendar (e.g. "May 24, 2025")
-    const todayLabel = dayjs().tz(TIMEZONE).format('MMMM D, YYYY');
-    console.log(`Looking for events under date header: "${todayLabel}"`);
-
+    // Build today’s YYYY-MM-DD for matching data-date
+    const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
     const reservations = [];
 
-    // 3) Locate the container for today’s events.
-    //    Adjust selectors as needed once you inspect your page’s DOM.
-    const dayContainer = $(`.eo-day-header:contains("${todayLabel}")`).parent();
+    // 2) Locate the correct fc-content-skeleton for today
+    $('.fc-content-skeleton').each((_, skel) => {
+      const $sk = $(skel);
+      // find column index
+      let idx = null;
+      $sk.find('thead td').each((i, th) => {
+        if ($(th).attr('data-date') === today) idx = i;
+      });
+      if (idx === null) return;
 
-    // 4) Within that container, find each event block
-    dayContainer.find('.eo-event').each((_, el) => {
-      const title = $(el).find('.eo-event-title').text().trim();
-      const time  = $(el).find('.eo-event-time').text().trim(); // e.g. "11:30 AM – 1:30 PM"
-      const [start, end] = time.split('–').map(s => s.trim());
-      if (title && start && end) {
-        reservations.push({ title, startTime: start, endTime: end });
-      }
+      // find corresponding cell in the body row
+      const $cell = $sk.find('tbody tr').first().find('td').eq(idx);
+
+      // 3) For each event link in that cell
+      $cell.find('a.fc-day-grid-event').each((_, a) => {
+        const $a = $(a);
+        const title = $a.find('.fc-title').text().trim();
+
+        // grab the tooltip ID from the link
+        const tipId = $a.attr('data-hasqtip');
+        let start, end;
+
+        if (tipId) {
+          // find the tooltip div with matching data-qtip-id
+          const content = $(`div[data-qtip-id="${tipId}"] .qtip-content`)
+            .text()
+            .trim();
+          // content looks like "May 24, 2025  10:00 AM - 9:00 PM"
+          const m = content.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/);
+          if (m) {
+            start = m[1];
+            end   = m[2];
+          }
+        }
+
+        // fallback: use only the inline time
+        if (!start || !end) {
+          const inline = $a.find('.fc-time').text().trim(); // e.g. "10:00 AM"
+          start = inline;
+          end   = inline;
+        }
+
+        if (title && start && end) {
+          reservations.push({ title, startTime: start, endTime: end });
+        }
+      });
     });
 
-    // 5) Return results (empty array if none found)
+    console.log(`Found ${reservations.length} events for ${today}`);
     return res.json({ reservations });
 
-  } catch (error) {
-    console.error('Error scraping pool calendar HTML:', error.message);
+  } catch (err) {
+    console.error('Error in /today-events:', err.message);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
