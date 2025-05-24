@@ -60,30 +60,22 @@ app.get('/proxy', async (req, res) => {
 
 app.get('/today-events', async (req, res) => {
   try {
-    // 1) Compute today’s date in YYYY-MM-DD
     const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
-
-    // 2) Build the exact AJAX URL (only for today)
-    const feedUrl = [
-      'https://wildwoodpool.com/wp-admin/admin-ajax.php',
-      '?action=eventorganiser-fullcal',
-      `&start=${today}`,
-      `&end=${today}`,
-      '&timeformat=g%3Ai%20A',
-      '&users_events=false'
-    ].join('');
+    const feedUrl = `https://wildwoodpool.com/wp-admin/admin-ajax.php` +
+      `?action=eventorganiser-fullcal` +
+      `&start=${today}` +
+      `&end=${today}` +
+      `&timeformat=g%3Ai%20A` +
+      `&users_events=false`;
 
     console.log(`Fetching calendar AJAX from ${feedUrl}`);
-
-    // 3) Fetch the feed
     const { data: events } = await axios.get(feedUrl);
     console.log(`Raw events payload:`, events);
 
-    // 4) Map and format each event
     const reservations = events.map(ev => {
-      // ev.start/ev.end are like "2025-05-24T10:00:00"
-      const s = dayjs(ev.start).tz(TIMEZONE).format('h:mmA');
-      const e = dayjs(ev.end  ).tz(TIMEZONE).format('h:mmA');
+      // Parse as UTC then convert to America/New_York
+      const s = dayjs.utc(ev.start).tz(TIMEZONE).format('h:mmA');
+      const e = dayjs.utc(ev.end  ).tz(TIMEZONE).format('h:mmA');
       console.log(`  → ${ev.title}: ${s} – ${e}`);
       return {
         title:     ev.title,
