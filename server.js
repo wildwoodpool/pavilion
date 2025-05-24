@@ -7,8 +7,8 @@ const cheerio   = require('cheerio');
 const dayjs     = require('dayjs');
 const utc       = require('dayjs/plugin/utc');
 const timezone  = require('dayjs/plugin/timezone');
-const ical      = require('node-ical');  // ICS parser for pool calendar
-const puppeteer = require('puppeteer');
+const ical      = require('node-ical');
+const { RRule } = require('rrule');
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -19,13 +19,15 @@ const TIMEZONE = 'America/New_York';
 
 app.use(cors());
 
-/** 
- * Existing proxy endpoint for Pavilion and Sport Court 
+
+/**
+ * Existing proxy endpoint for Pavilion and Sport Court
  */
 app.get('/proxy', async (req, res) => {
   try {
     let { reservationDate, facility_id, court_id } = req.query;
 
+    // default to today in Eastern if none provided
     if (!reservationDate) {
       reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
     }
@@ -58,58 +60,78 @@ app.get('/proxy', async (req, res) => {
   }
 });
 
+
+/**
+ * New route: Today’s Pool Calendar events from ICS feed
+ */
 app.get('/today-events', async (req, res) => {
-  let browser;
   try {
-    // 1) Launch headless
-    browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
-    const page = await browser.newPage();
+    const icsUrl = 'https://wildwoodpool.com/feed/eo-events?ical=1';
+    console.log(`Fetching pool calendar ICS from ${icsUrl}`);
 
-    // 2) Go to the calendar page
-    await page.goto('https://wildwoodpool.com/calendar/', {
-      waitUntil: 'networkidle2',
-      timeout: 0
-    });
+    // Fetch the ICS feed
+    const { data: icsData } = await axios.get(icsUrl);
+    if (typeof icsData !== 'string' || !icsData.includes('BEGIN:VCALENDAR')) {
+      throw new Error('Invalid ICS data');
+    }
 
-    // 3) Wait for the calendar JS to render your events (adjust selector as needed)
-    //    Here I’m assuming each event is in an element with class `.ms-event-title`
-    await page.waitForSelector('.ms-event-item', { timeout: 10000 });
+    // Parse all components
+    const parsed = ical.parseICS(icsData);
 
-    // 4) Extract all events that have today’s date label
-    const today = new Date().toLocaleDateString('en-US', {
-      timeZone: 'America/New_York',
-      month: 'long',
-      day:   'numeric',
-      year:  'numeric'
-    }); // e.g. "May 24, 2025"
+    // Define today’s window in ET
+    const startOfDay = dayjs().tz(TIMEZONE).startOf('day').toDate();
+    const endOfDay   = dayjs().tz(TIMEZONE).endOf('day').toDate();
 
-    const reservations = await page.evaluate(today => {
-      const items = Array.from(document.querySelectorAll('.ms-event-item'));
-      return items
-        .filter(el => {
-          // The element that shows the date—adjust selector as needed
-          const dateEl = el.querySelector('.ms-event-date');
-          return dateEl && dateEl.textContent.trim() === today;
-        })
-        .map(el => {
-          const titleEl = el.querySelector('.ms-event-title');
-          const timeEl  = el.querySelector('.ms-event-time');
-          return {
-            title:     titleEl   ? titleEl.textContent.trim()   : '',
-            startTime: timeEl   ? timeEl.textContent.trim().split('–')[0].trim() : '',
-            endTime:   timeEl   ? timeEl.textContent.trim().split('–')[1].trim() : ''
-          };
+    const occurrences = [];
+
+    // Iterate through VEVENTs
+    for (const evt of Object.values(parsed)) {
+      if (evt.type !== 'VEVENT') continue;
+
+      // Single-instance event
+      if (!evt.rrule) {
+        const evStart = dayjs(evt.start).tz(TIMEZONE).toDate();
+        if (evStart >= startOfDay && evStart <= endOfDay) {
+          occurrences.push({
+            start: evStart,
+            end:   dayjs(evt.end).tz(TIMEZONE).toDate(),
+            summary: evt.summary || ''
+          });
+        }
+      } else {
+        // Recurring event: expand occurrences for today
+        const between = evt.rrule.between(startOfDay, endOfDay, true);
+        between.forEach(dt => {
+          // Skip exceptions
+          const exDates = evt.exdate || {};
+          if (exDates[dt.toISOString().substr(0,10)]) return;
+
+          // Compute end by duration
+          const durationMs = evt.end.getTime() - evt.start.getTime();
+          occurrences.push({
+            start: dt,
+            end:   new Date(dt.getTime() + durationMs),
+            summary: evt.summary || ''
+          });
         });
-    }, today);
+      }
+    }
 
-    await browser.close();
+    // Map to JSON shape
+    const reservations = occurrences.map(o => {
+      const s = dayjs(o.start).tz(TIMEZONE);
+      const e = dayjs(o.end).tz(TIMEZONE);
+      return {
+        startTime: s.format('h:mmA'),
+        endTime:   e.format('h:mmA'),
+        title:     o.summary
+      };
+    });
+
     return res.json({ reservations });
 
-  } catch (err) {
-    if (browser) await browser.close();
-    console.error('Error scraping pool calendar:', err);
+  } catch (error) {
+    console.error('Error fetching or parsing pool calendar:', error.message);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
@@ -128,7 +150,10 @@ function parsePavilion($) {
     }
   });
 
+  // Remove placeholders
   const filtered = raw.filter(r => r.status !== r.startTime);
+
+  // Merge consecutive identical statuses
   const merged = [];
   let i = 0;
   while (i < filtered.length) {
@@ -140,24 +165,20 @@ function parsePavilion($) {
     ) {
       j++;
     }
-    current.endTime = filtered[j]
-      ? filtered[j].startTime
-      : current.startTime;
+    current.endTime = filtered[j] ? filtered[j].startTime : current.startTime;
     merged.push(current);
     i = j;
   }
 
+  // Shift endTimes
   for (let k = 0; k < merged.length - 1; k++) {
     merged[k].endTime = merged[k + 1].startTime;
   }
 
-  const ignoreStatuses = [
-    'Setup time',
-    'Takedown time',
-    'Setup and takedown time',
-    'Open',
-    'Not open',
-    'Not available for rental'
+  // Clean and filter unwanted
+  const ignore = [
+    'Setup time','Takedown time','Setup and takedown time',
+    'Open','Not open','Not available for rental'
   ];
   const cleaned = merged
     .map(r => ({
@@ -165,8 +186,9 @@ function parsePavilion($) {
       endTime:   r.endTime,
       status:    cleanStatus(r.status)
     }))
-    .filter(r => r.status && !ignoreStatuses.includes(r.status));
+    .filter(r => r.status && !ignore.includes(r.status));
 
+  // Last-event fallback
   if (cleaned.length > 0) {
     const last = cleaned[cleaned.length - 1];
     if (!last.endTime || last.endTime === last.startTime) {
@@ -186,8 +208,7 @@ function parseSportCourt($) {
   const ignoreSport = [
     'Walk-up basketball only',
     'Not available before 8am on weekends',
-    'Closed',
-    'Open'
+    'Closed','Open'
   ].map(s => s.toLowerCase());
 
   $('tr').each((_, el) => {
@@ -196,7 +217,7 @@ function parseSportCourt($) {
     if (!isValidTime(timeText)) return;
     if (!statusText.includes('-')) return;
 
-    const lower = statusText.trim().toLowerCase();
+    const lower = statusText.toLowerCase().trim();
     if (ignoreSport.includes(lower)) return;
 
     const m = statusText.match(
@@ -212,7 +233,7 @@ function parseSportCourt($) {
     const sportMatch = person.match(/(Pickleball|Basketball)$/i);
     if (sportMatch) {
       sport  = sportMatch[1];
-      person = person.slice(0, person.length - sport.length).trim();
+      person = person.slice(0, person.length - sport.length).trim();  
     }
 
     events.push({ startTime, endTime, person, sport });
@@ -230,11 +251,13 @@ function isValidTime(str) {
 }
 
 function cleanStatus(status) {
-  status = status.replace(
-    /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i,
-    ''
-  );
-  return status.replace(/Member Event/gi, '').trim();
+  return status
+    .replace(
+      /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)\s*-\s*([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)/i,
+      ''
+    )
+    .replace(/Member Event/gi, '')
+    .trim();
 }
 
 function normalizeStatus(status) {
