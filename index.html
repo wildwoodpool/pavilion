@@ -147,7 +147,8 @@ async function loadReservations(retry = false) {
     if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
     const data = await response.json();
 
-    const reservations = data.reservations || [];
+    const reservations = (data.reservations || [])
+      .filter(r => r.status.trim() !== '-');
 
     const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
     let now;
