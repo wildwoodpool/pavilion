@@ -148,8 +148,7 @@ async function loadReservations(retry = false) {
     const data = await response.json();
 
     const reservations = data.reservations || [];
-     // drop any “–” placeholder entries
-       .filter(r => r.status !== '-');
+
     const baseDate = dayjs.tz(reservationDateStr, 'M/D/YYYY', 'America/New_York');
     let now;
 
