@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Today's Sport Court Reservations</title>
+  <title>Today's Pavilion Reservations</title>
   <style>
     body {
       width: 384px;               /* fixed panel width */
@@ -26,7 +26,7 @@
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 14px;            /* reduced for 384px width */
+      font-size: 14px;            /* proportional downsize for 384px width */
       line-height: 1.2;
       margin: 0;
       padding: 2px 0;
@@ -41,26 +41,20 @@
       border: 1px solid white;
       border-radius: 6px;
       padding: 4px;               /* slightly smaller padding */
-    }
-    .basketball {
-      background-color: #174A8A;
-    }
-    .pickleball {
-      background-color: purple;
+      background-color: #174A8A;  /* light blue for pavilion */
     }
     .no-reservation {
       border: 1px solid white;
       border-radius: 6px;
       padding: 4px;
+      background-color: #022f6d;  /* same as page background */
       text-align: center;
-      background-color: #022f6d;
     }
     .person {
       font-size: 12px;            /* proportional downsize */
       font-weight: bold;
       margin-bottom: 2px;
     }
-    .sport,
     .time {
       font-size: 10px;            /* proportional downsize */
       margin: 0;
@@ -71,47 +65,39 @@
 <body>
   <hr class="separator">
   <div class="header">
-    Today's Sport Court<br>
+    Today's Pavilion<br>
     Reservations
   </div>
   <hr class="separator">
   <div id="reservations" class="reservations">
-    <!-- Reservations will be injected here -->
+    <!-- Pavilion reservations will be injected here -->
   </div>
   <script>
     async function loadReservations() {
       try {
-        const response = await fetch(
-          'https://pavilion.onrender.com/proxy?facility_id=2027&court_id=15094'
-        );
-        const data = await response.json();
+        const resp = await fetch('https://pavilion.onrender.com/proxy?facility_id=2103&court_id=15094');
+        const data = await resp.json();
         const container = document.getElementById('reservations');
         container.innerHTML = '';
 
         if (data.reservations && data.reservations.length > 0) {
           data.reservations.forEach(r => {
-            const div = document.createElement('div');
-            div.classList.add('reservation');
-            div.classList.add(
-              r.sport.toLowerCase() === 'basketball'
-                ? 'basketball'
-                : 'pickleball'
-            );
-            div.innerHTML = `
-              <div class="person">${r.person}</div>
-              <div class="sport">${r.sport}</div>
+            const box = document.createElement('div');
+            box.className = 'reservation';
+            box.innerHTML = `
+              <div class="person">${r.status}</div>
               <div class="time">${r.startTime} - ${r.endTime}</div>
             `;
-            container.appendChild(div);
+            container.appendChild(box);
           });
         } else {
-          const div = document.createElement('div');
-          div.classList.add('no-reservation');
-          div.textContent = 'No reservations today';
-          container.appendChild(div);
+          const box = document.createElement('div');
+          box.className = 'no-reservation';
+          box.textContent = 'No reservations today';
+          container.appendChild(box);
         }
       } catch (e) {
-        console.error('Failed to load reservations', e);
+        console.error('Failed to load pavilion reservations', e);
       }
     }
 
