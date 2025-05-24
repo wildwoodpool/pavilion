@@ -61,65 +61,54 @@ app.get('/proxy', async (req, res) => {
 app.get('/today-events', async (req, res) => {
   try {
     const calendarUrl = 'https://wildwoodpool.com/calendar/';
-    console.log(`Scraping HTML from ${calendarUrl}`);
+    const today       = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
+    console.log(`\n--- Scraping events for ${today} from ${calendarUrl} ---\n`);
 
-    // 1) Fetch the page
     const { data: html } = await axios.get(calendarUrl);
     const $ = cheerio.load(html);
 
-    // Build today’s YYYY-MM-DD for matching data-date
-    const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
     const reservations = [];
 
-    // 2) Locate the correct fc-content-skeleton for today
-    $('.fc-content-skeleton').each((_, skel) => {
-      const $sk = $(skel);
-      // find column index
-      let idx = null;
-      $sk.find('thead td').each((i, th) => {
-        if ($(th).attr('data-date') === today) idx = i;
-      });
-      if (idx === null) return;
+    // 1) Iterate every fc-day-number cell and log its date
+    $('td.fc-day-number').each((_, td) => {
+      const $td     = $(td);
+      const cellDate = $td.attr('data-date');
+      console.log(`Inspecting cell for date: ${cellDate}`);
 
-      // find corresponding cell in the body row
-      const $cell = $sk.find('tbody tr').first().find('td').eq(idx);
+      // 2) Only process today’s cell for output, but log all cells
+      if (cellDate !== today) return;
 
-      // 3) For each event link in that cell
-      $cell.find('a.fc-day-grid-event').each((_, a) => {
-        const $a = $(a);
+      // 3) From that cell’s table, find any events
+      const $table = $td.closest('table');
+      $table.find('td.fc-event-container a.fc-day-grid-event').each((_, a) => {
+        const $a    = $(a);
         const title = $a.find('.fc-title').text().trim();
 
-        // grab the tooltip ID from the link
+        // Inline start time
+        let start = $a.find('.fc-time').text().trim();
+        let end   = start;
+
+        // Tooltip full range?
         const tipId = $a.attr('data-hasqtip');
-        let start, end;
-
         if (tipId) {
-          // find the tooltip div with matching data-qtip-id
-          const content = $(`div[data-qtip-id="${tipId}"] .qtip-content`)
-            .text()
-            .trim();
-          // content looks like "May 24, 2025  10:00 AM - 9:00 PM"
-          const m = content.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/);
-          if (m) {
-            start = m[1];
-            end   = m[2];
-          }
+          const tooltipText = $(`div[data-qtip-id="${tipId}"] .qtip-content`)
+                                .text().trim();
+          const m = tooltipText.match(
+            /(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/
+          );
+          if (m) { start = m[1]; end = m[2]; }
         }
 
-        // fallback: use only the inline time
-        if (!start || !end) {
-          const inline = $a.find('.fc-time').text().trim(); // e.g. "10:00 AM"
-          start = inline;
-          end   = inline;
-        }
+        console.log(
+          `  → Found event on ${cellDate}: "${title}" ` +
+          `from ${start} to ${end}`
+        );
 
-        if (title && start && end) {
-          reservations.push({ title, startTime: start, endTime: end });
-        }
+        reservations.push({ title, startTime: start, endTime: end });
       });
     });
 
-    console.log(`Found ${reservations.length} events for ${today}`);
+    console.log(`\nTotal events for ${today}: ${reservations.length}\n`);
     return res.json({ reservations });
 
   } catch (err) {
