@@ -70,12 +70,12 @@ app.get('/today-events', async (req, res) => {
 
     console.log(`Fetching calendar AJAX from ${feedUrl}`);
     const { data: events } = await axios.get(feedUrl);
-    console.log(`Raw events payload:`, events);
+    console.log(`Raw events payload:\n`, events);
 
+    // Map each event, parsing the feed timestamps _as_ America/New_York times
     const reservations = events.map(ev => {
-      // Parse as UTC then convert to America/New_York
-      const s = dayjs.utc(ev.start).tz(TIMEZONE).format('h:mmA');
-      const e = dayjs.utc(ev.end  ).tz(TIMEZONE).format('h:mmA');
+      const s = dayjs.tz(ev.start, TIMEZONE).format('h:mmA');
+      const e = dayjs.tz(ev.end,   TIMEZONE).format('h:mmA');
       console.log(`  → ${ev.title}: ${s} – ${e}`);
       return {
         title:     ev.title,
