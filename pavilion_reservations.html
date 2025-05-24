@@ -2,30 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Today's Pavilion Reservations</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      width: 100%;
       height: 100%;
+      overflow: hidden;
       background: transparent;
     }
     #wrapper {
       box-sizing: border-box;
       width: 100%;
-      max-width: 384px;
       height: 100%;
       background-color: #022f6d;
       color: white;
       font-family: sans-serif;
-      padding: 4px 8px;
+      padding: 4px 6px;
     }
     .separator {
       width: 75%;
       height: 1px;
       background-color: white;
       margin: 4px auto;
+      border: none;
     }
     .separator:first-of-type {
       margin-top: 0;
@@ -49,6 +51,7 @@
       border-radius: 5px;
       padding: 3px;
       background-color: #174A8A;
+      box-sizing: border-box;
     }
     .person {
       font-size: 10px;
@@ -67,6 +70,7 @@
       border-radius: 5px;
       padding: 3px;
       background-color: #022f6d;
+      box-sizing: border-box;
     }
   </style>
 </head>
@@ -82,7 +86,6 @@
       <!-- injected here -->
     </div>
   </div>
-
   <script>
     async function loadReservations() {
       try {
@@ -92,7 +95,6 @@
         const data = await resp.json();
         const container = document.getElementById('reservations');
         container.innerHTML = '';
-
         if (data.reservations?.length) {
           data.reservations.forEach(r => {
             const box = document.createElement('div');
