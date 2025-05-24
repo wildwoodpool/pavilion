@@ -4,14 +4,20 @@
   <meta charset="UTF-8">
   <title>Today's Pavilion Reservations</title>
   <style>
-    body {
-      width: 384px;               /* fixed panel width */
+    /* Force panel width */
+    html, body, #wrapper {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      width: 384px !important;
+      overflow-x: hidden;
+    }
+    #wrapper {
+      height: 100%;
       background-color: #022f6d;
       color: white;
-      margin: 0;
-      padding: 4px 8px;
       font-family: sans-serif;
-      box-sizing: border-box;
+      padding: 4px 8px;
     }
     .separator {
       width: 75%;
@@ -26,7 +32,7 @@
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 14px;            /* proportional downsize for 384px width */
+      font-size: 12px;
       line-height: 1.2;
       margin: 0;
       padding: 2px 0;
@@ -34,48 +40,54 @@
     .reservations {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      margin-top: 4px;
+      gap: 3px;
+      margin-top: 3px;
     }
     .reservation {
       border: 1px solid white;
-      border-radius: 6px;
-      padding: 4px;               /* slightly smaller padding */
-      background-color: #174A8A;  /* light blue for pavilion */
-    }
-    .no-reservation {
-      border: 1px solid white;
-      border-radius: 6px;
-      padding: 4px;
-      background-color: #022f6d;  /* same as page background */
-      text-align: center;
+      border-radius: 5px;
+      padding: 3px;
+      background-color: #174A8A; /* uniform light-blue */
     }
     .person {
-      font-size: 12px;            /* proportional downsize */
+      font-size: 10px;
       font-weight: bold;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     .time {
-      font-size: 10px;            /* proportional downsize */
+      font-size: 8px;
       margin: 0;
       line-height: 1.2;
+    }
+    .no-reservation {
+      font-size: 10px;
+      text-align: center;
+      border: 1px solid white;
+      border-radius: 5px;
+      padding: 3px;
+      background-color: #022f6d; /* same as panel */
     }
   </style>
 </head>
 <body>
-  <hr class="separator">
-  <div class="header">
-    Today's Pavilion<br>
-    Reservations
+  <div id="wrapper">
+    <hr class="separator">
+    <div class="header">
+      Today's Pavilion<br>
+      Reservations
+    </div>
+    <hr class="separator">
+    <div id="reservations" class="reservations">
+      <!-- injected here -->
+    </div>
   </div>
-  <hr class="separator">
-  <div id="reservations" class="reservations">
-    <!-- Pavilion reservations will be injected here -->
-  </div>
+
   <script>
     async function loadReservations() {
       try {
-        const resp = await fetch('https://pavilion.onrender.com/proxy?facility_id=2103&court_id=15094');
+        const resp = await fetch(
+          'https://pavilion.onrender.com/proxy?facility_id=2103&court_id=15094'
+        );
         const data = await resp.json();
         const container = document.getElementById('reservations');
         container.innerHTML = '';
@@ -86,7 +98,7 @@
             box.className = 'reservation';
             box.innerHTML = `
               <div class="person">${r.status}</div>
-              <div class="time">${r.startTime} - ${r.endTime}</div>
+              <div class="time">${r.startTime} – ${r.endTime}</div>
             `;
             container.appendChild(box);
           });
@@ -101,7 +113,6 @@
       }
     }
 
-    // Initial load and refresh every 5 minutes
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>

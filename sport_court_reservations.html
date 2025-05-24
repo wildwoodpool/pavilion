@@ -4,23 +4,20 @@
   <meta charset="UTF-8">
   <title>Today's Sport Court Reservations</title>
   <style>
-    /* make sure nothing ever exceeds our fixed panel width */
-    html, body {
+    /* Force entire panel to exactly 384 px */
+    html, body, #wrapper {
       margin: 0;
       padding: 0;
-      overflow: hidden;
-      height: 100%;
-      background: transparent;
-    }
-    /* real container: 384px wide, padding included */
-    #wrapper {
       box-sizing: border-box;
-      width: 384px;
+      width: 384px !important;
+      overflow-x: hidden;
+    }
+    #wrapper {
       height: 100%;
       background-color: #022f6d;
       color: white;
       font-family: sans-serif;
-      padding: 4px 4px;
+      padding: 4px 8px;
     }
     .separator {
       width: 75%;
@@ -35,7 +32,7 @@
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 12px;    /* ↓ smaller to fit two words cleanly */
+      font-size: 12px;
       line-height: 1.2;
       margin: 0;
       padding: 2px 0;
@@ -47,10 +44,9 @@
       margin-top: 3px;
     }
     .reservation {
-      box-sizing: border-box;
       border: 1px solid white;
       border-radius: 5px;
-      padding: 3px;       /* ↓ tighter padding */
+      padding: 3px;
     }
     .basketball {
       background-color: #174A8A;
@@ -59,24 +55,23 @@
       background-color: purple;
     }
     .person {
-      font-size: 10px;    /* ↓ smaller */
+      font-size: 10px;
       font-weight: bold;
       margin-bottom: 1px;
     }
     .sport,
     .time {
-      font-size: 8px;     /* ↓ smaller */
+      font-size: 8px;
       margin: 0;
       line-height: 1.2;
     }
     .no-reservation {
-      box-sizing: border-box;
+      font-size: 10px;
+      text-align: center;
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
-      text-align: center;
       background-color: #022f6d;
-      font-size: 10px;
     }
   </style>
 </head>
@@ -89,7 +84,7 @@
     </div>
     <hr class="separator">
     <div id="reservations" class="reservations">
-      <!-- Reservations will go here -->
+      <!-- injected here -->
     </div>
   </div>
 
@@ -128,7 +123,6 @@
       }
     }
 
-    // load on start, refresh every 5 minutes
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
