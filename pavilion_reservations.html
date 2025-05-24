@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Today's Pavilion Reservations</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     html, body {
       margin: 0;
@@ -16,18 +16,19 @@
     #wrapper {
       box-sizing: border-box;
       width: 100%;
+      max-width: 384px;
       height: 100%;
       background-color: #022f6d;
       color: white;
       font-family: sans-serif;
-      padding: 4px 6px;
+      padding: 4px 8px;
     }
     .separator {
       width: 75%;
       height: 1px;
       background-color: white;
-      margin: 4px auto;
       border: none;
+      margin: 4px auto;
     }
     .separator:first-of-type {
       margin-top: 0;
@@ -50,8 +51,8 @@
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
-      background-color: #174A8A;
-      box-sizing: border-box;
+      text-align: center;
+      font-size: 10px;
     }
     .person {
       font-size: 10px;
@@ -70,7 +71,6 @@
       border-radius: 5px;
       padding: 3px;
       background-color: #022f6d;
-      box-sizing: border-box;
     }
   </style>
 </head>
@@ -78,14 +78,14 @@
   <div id="wrapper">
     <hr class="separator">
     <div class="header">
-      Today's Pavilion<br>
-      Reservations
+      Today's Pavilion<br>Reservations
     </div>
     <hr class="separator">
     <div id="reservations" class="reservations">
       <!-- injected here -->
     </div>
   </div>
+
   <script>
     async function loadReservations() {
       try {
@@ -93,10 +93,15 @@
           'https://pavilion.onrender.com/proxy?facility_id=2103&court_id=15094'
         );
         const data = await resp.json();
+
+        // Filter out any entries where status === "-"
+        const valid = (data.reservations || []).filter(r => r.status !== '-');
+
         const container = document.getElementById('reservations');
         container.innerHTML = '';
-        if (data.reservations?.length) {
-          data.reservations.forEach(r => {
+
+        if (valid.length > 0) {
+          valid.forEach(r => {
             const box = document.createElement('div');
             box.className = 'reservation';
             box.innerHTML = `
@@ -115,6 +120,8 @@
         console.error('Failed to load pavilion reservations', e);
       }
     }
+
+    // Initial load + refresh every 5 minutes
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
