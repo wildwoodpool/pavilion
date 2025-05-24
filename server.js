@@ -1,4 +1,4 @@
-// server.js — Unified proxy for Pavilion (2103), Sport Court (2027), and Pool Calendar Today
+// server.js — Unified proxy for Pavilion (2103), Sport Court (2027), and Pool Calendar Today (HTML scrape)
 
 const express   = require('express');
 const cors      = require('cors');
@@ -7,8 +7,6 @@ const cheerio   = require('cheerio');
 const dayjs     = require('dayjs');
 const utc       = require('dayjs/plugin/utc');
 const timezone  = require('dayjs/plugin/timezone');
-const ical      = require('node-ical');
-const { RRule } = require('rrule');
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -27,7 +25,6 @@ app.get('/proxy', async (req, res) => {
   try {
     let { reservationDate, facility_id, court_id } = req.query;
 
-    // default to today in Eastern if none provided
     if (!reservationDate) {
       reservationDate = dayjs().tz(TIMEZONE).format('M/D/YYYY');
     }
@@ -61,54 +58,50 @@ app.get('/proxy', async (req, res) => {
 });
 
 
+/**
+ * New route: Today’s Pool Calendar events by scraping the public HTML calendar
+ */
 app.get('/today-events', async (req, res) => {
   try {
-    const icsUrl  = 'https://wildwoodpool.com/feed/eo-events?ical=1';
-    const todayUtc = dayjs().utc().format('YYYY-MM-DD');
-    console.log(`UTC today is ${todayUtc}, fetching ${icsUrl}`);
+    const calendarUrl = 'https://wildwoodpool.com/calendar/';
+    console.log(`Scraping pool calendar HTML from ${calendarUrl}`);
 
-    const { data: icsData } = await axios.get(icsUrl);
-    if (typeof icsData !== 'string' || !icsData.includes('BEGIN:VCALENDAR')) {
-      throw new Error('Invalid ICS');
-    }
+    // 1) Fetch the calendar page
+    const { data: html } = await axios.get(calendarUrl);
+    const $ = cheerio.load(html);
 
-    const parsed = ical.parseICS(icsData);
+    // 2) Build today's date string as shown on the calendar (e.g. "May 24, 2025")
+    const todayLabel = dayjs().tz(TIMEZONE).format('MMMM D, YYYY');
+    console.log(`Looking for events under date header: "${todayLabel}"`);
 
-    // Collect all VEVENTs, regardless of recurrence
-    const events = Object.values(parsed)
-      .filter(e => e.type === 'VEVENT')
-      .map(e => {
-        const d = dayjs(e.start).utc().format('YYYY-MM-DD');
-        console.log(`  Found event ${e.summary} on ${d}`);
-        return { start: e.start, end: e.end, summary: e.summary, date: d };
-      });
+    const reservations = [];
 
-    // Filter for those whose UTC date matches
-    const todays = events.filter(ev => ev.date === todayUtc);
+    // 3) Locate the container for today’s events.
+    //    Adjust selectors as needed once you inspect your page’s DOM.
+    const dayContainer = $(`.eo-day-header:contains("${todayLabel}")`).parent();
 
-    console.log(`Returning ${todays.length} events for UTC today ${todayUtc}`);
-
-    // Map to your JSON shape
-    const reservations = todays.map(ev => {
-      const s = dayjs(ev.start).tz(TIMEZONE);
-      const e = dayjs(ev.end).tz(TIMEZONE);
-      return {
-        startTime: s.format('h:mmA'),
-        endTime:   e.format('h:mmA'),
-        title:     ev.summary
-      };
+    // 4) Within that container, find each event block
+    dayContainer.find('.eo-event').each((_, el) => {
+      const title = $(el).find('.eo-event-title').text().trim();
+      const time  = $(el).find('.eo-event-time').text().trim(); // e.g. "11:30 AM – 1:30 PM"
+      const [start, end] = time.split('–').map(s => s.trim());
+      if (title && start && end) {
+        reservations.push({ title, startTime: start, endTime: end });
+      }
     });
 
+    // 5) Return results (empty array if none found)
     return res.json({ reservations });
 
-  } catch (err) {
-    console.error('Error in /today-events:', err.message);
+  } catch (error) {
+    console.error('Error scraping pool calendar HTML:', error.message);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
 
+
 // ────────────────────────────────────────────────────────────────────────────
-// Pavilion parser (facility_id = 2103)
+// Pavilion parser (facility_id = 2103) — unchanged
 // ────────────────────────────────────────────────────────────────────────────
 function parsePavilion($) {
   const raw = [];
@@ -120,10 +113,7 @@ function parsePavilion($) {
     }
   });
 
-  // Remove placeholders
   const filtered = raw.filter(r => r.status !== r.startTime);
-
-  // Merge consecutive identical statuses
   const merged = [];
   let i = 0;
   while (i < filtered.length) {
@@ -139,14 +129,10 @@ function parsePavilion($) {
     merged.push(current);
     i = j;
   }
-
-  // Shift endTimes
   for (let k = 0; k < merged.length - 1; k++) {
     merged[k].endTime = merged[k + 1].startTime;
   }
-
-  // Clean and filter unwanted
-  const ignore = [
+  const ignoreStatuses = [
     'Setup time','Takedown time','Setup and takedown time',
     'Open','Not open','Not available for rental'
   ];
@@ -156,22 +142,19 @@ function parsePavilion($) {
       endTime:   r.endTime,
       status:    cleanStatus(r.status)
     }))
-    .filter(r => r.status && !ignore.includes(r.status));
-
-  // Last-event fallback
+    .filter(r => r.status && !ignoreStatuses.includes(r.status));
   if (cleaned.length > 0) {
     const last = cleaned[cleaned.length - 1];
     if (!last.endTime || last.endTime === last.startTime) {
       last.endTime = '9:00PM';
     }
   }
-
   return cleaned;
 }
 
 
 // ────────────────────────────────────────────────────────────────────────────
-// Sport Court parser (facility_id = 2027)
+// Sport Court parser (facility_id = 2027) — unchanged
 // ────────────────────────────────────────────────────────────────────────────
 function parseSportCourt($) {
   const events = [];
@@ -196,8 +179,6 @@ function parseSportCourt($) {
     if (!m) return;
 
     const [, startRaw, endRaw, rest] = m;
-    const startTime = startRaw.toUpperCase();
-    const endTime   = endRaw.toUpperCase();
     let person = rest.trim();
     let sport  = '';
     const sportMatch = person.match(/(Pickleball|Basketball)$/i);
@@ -205,8 +186,11 @@ function parseSportCourt($) {
       sport  = sportMatch[1];
       person = person.slice(0, person.length - sport.length).trim();  
     }
-
-    events.push({ startTime, endTime, person, sport });
+    events.push({
+      startTime: startRaw.toUpperCase(),
+      endTime:   endRaw.toUpperCase(),
+      person, sport
+    });
   });
 
   return events;
@@ -214,12 +198,11 @@ function parseSportCourt($) {
 
 
 // ────────────────────────────────────────────────────────────────────────────
-// Helpers
+// Helpers — unchanged
 // ────────────────────────────────────────────────────────────────────────────
 function isValidTime(str) {
   return /^([0]?[1-9]|1[0-2]):[0-5][0-9](AM|PM)$/i.test(str);
 }
-
 function cleanStatus(status) {
   return status
     .replace(
@@ -229,7 +212,6 @@ function cleanStatus(status) {
     .replace(/Member Event/gi, '')
     .trim();
 }
-
 function normalizeStatus(status) {
   return cleanStatus(status).toLowerCase();
 }
