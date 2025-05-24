@@ -12,19 +12,20 @@
       font-family: sans-serif;
       box-sizing: border-box;
     }
-    .header {
-      text-align: center;
-      font-weight: bold;
-      font-size: 24px;
-      line-height: 1.2;
-      margin-bottom: 8px;
-    }
     .separator {
       width: 75%;
       height: 2px;
       background-color: white;
       border: none;
       margin: 8px auto;
+    }
+    .header {
+      text-align: center;
+      font-weight: bold;
+      font-size: 18px; /* reduced font size for better fit */
+      line-height: 1.2;
+      margin: 0;
+      padding: 4px 0;
     }
     .reservations {
       display: flex;
@@ -50,15 +51,16 @@
       text-align: center;
     }
     .person {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: bold;
     }
     .sport, .time {
-      font-size: 16px;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
+  <hr class="separator">
   <div class="header">Today's Sport Court<br>Reservations</div>
   <hr class="separator">
   <div id="reservations" class="reservations">
