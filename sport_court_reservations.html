@@ -8,35 +8,35 @@
       background-color: #022f6d;
       color: white;
       margin: 0;
-      padding: 10px;
+      padding: 8px;
       font-family: sans-serif;
       box-sizing: border-box;
     }
     .separator {
       width: 75%;
-      height: 2px;
+      height: 1px;
       background-color: white;
       border: none;
-      margin: 8px auto;
+      margin: 6px auto;
     }
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 18px;
-      line-height: 1.2;
+      font-size: 16px;      /* reduced from 18px */
+      line-height: 1.1;
       margin: 0;
-      padding: 4px 0;
+      padding: 2px 0;
     }
     .reservations {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-top: 8px;
+      gap: 6px;
+      margin-top: 6px;
     }
     .reservation {
       border: 1px solid white;
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 6px;
+      padding: 6px;
     }
     .basketball {
       background-color: #174A8A;
@@ -46,17 +46,17 @@
     }
     .no-reservation {
       border: 1px solid white;
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 6px;
+      padding: 6px;
       text-align: center;
     }
     .person {
-      font-size: 16px;
+      font-size: 14px;      /* reduced from 16px */
       font-weight: bold;
     }
     .sport,
     .time {
-      font-size: 14px;
+      font-size: 12px;      /* reduced from 14px */
     }
   </style>
 </head>
@@ -68,7 +68,7 @@
   </div>
   <hr class="separator">
   <div id="reservations" class="reservations">
-    <!-- Reservations will be injected here -->
+    <!-- Reservations injected here -->
   </div>
   <hr class="separator">
   <script>
@@ -102,9 +102,8 @@
       }
     }
 
-    // Load on page load
+    // Initial load and refresh every 5 minutes
     loadReservations();
-    // Optionally refresh every 5 minutes
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
 </body>
