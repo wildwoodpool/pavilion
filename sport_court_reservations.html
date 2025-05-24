@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Today's Sport Court Reservations</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    /* Reset and ensure we fill the iframe/zone exactly */
     html, body {
       margin: 0;
       padding: 0;
@@ -14,10 +13,10 @@
       overflow: hidden;
       background: transparent;
     }
-    /* Wrapper fills the zone, uses box-padding inside it */
     #wrapper {
       box-sizing: border-box;
       width: 100%;
+      max-width: 384px;
       height: 100%;
       background-color: #022f6d;
       color: white;
@@ -49,31 +48,37 @@
       margin-top: 3px;
     }
     .reservation {
+      box-sizing: border-box;
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
-      box-sizing: border-box;
+      text-align: center;
     }
-    .basketball { background-color: #174A8A; }
-    .pickleball  { background-color: purple; }
+    .basketball {
+      background-color: #174A8A;
+    }
+    .pickleball {
+      background-color: purple;
+    }
     .person {
       font-size: 10px;
       font-weight: bold;
-      margin-bottom: 1px;
+      margin: 0 0 1px;
     }
-    .sport, .time {
+    .sport,
+    .time {
       font-size: 8px;
       margin: 0;
       line-height: 1.2;
     }
     .no-reservation {
+      box-sizing: border-box;
       font-size: 10px;
       text-align: center;
       border: 1px solid white;
       border-radius: 5px;
       padding: 3px;
       background-color: #022f6d;
-      box-sizing: border-box;
     }
   </style>
 </head>
@@ -81,14 +86,14 @@
   <div id="wrapper">
     <hr class="separator">
     <div class="header">
-      Today's Sport Court<br>
-      Reservations
+      Today's Sport Court<br>Reservations
     </div>
     <hr class="separator">
     <div id="reservations" class="reservations">
       <!-- injected here -->
     </div>
   </div>
+
   <script>
     async function loadReservations() {
       try {
@@ -98,13 +103,12 @@
         const data = await resp.json();
         const container = document.getElementById('reservations');
         container.innerHTML = '';
+
         if (data.reservations?.length) {
           data.reservations.forEach(r => {
             const box = document.createElement('div');
             box.className = 'reservation ' +
-              (r.sport.toLowerCase() === 'basketball'
-                ? 'basketball'
-                : 'pickleball');
+              (r.sport.toLowerCase() === 'basketball' ? 'basketball' : 'pickleball');
             box.innerHTML = `
               <div class="person">${r.person}</div>
               <div class="sport">${r.sport}</div>
