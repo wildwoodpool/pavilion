@@ -8,36 +8,35 @@
       background-color: #022f6d;
       color: white;
       margin: 0;
-      padding: 8px;
+      padding: 10px;
       font-family: sans-serif;
       box-sizing: border-box;
-      width: 384px;
     }
     .separator {
       width: 75%;
-      height: 1px;
+      height: 2px;
       background-color: white;
       border: none;
-      margin: 6px auto;
+      margin: 8px auto;
     }
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 16px;
-      line-height: 1.1;
+      font-size: 18px;
+      line-height: 1.2;
       margin: 0;
-      padding: 2px 0;
+      padding: 4px 0;
     }
     .reservations {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-top: 6px;
+      gap: 8px;
+      margin-top: 8px;
     }
     .reservation {
       border: 1px solid white;
-      border-radius: 6px;
-      padding: 6px;
+      border-radius: 8px;
+      padding: 8px;
     }
     .basketball {
       background-color: #174A8A;
@@ -47,17 +46,17 @@
     }
     .no-reservation {
       border: 1px solid white;
-      border-radius: 6px;
-      padding: 6px;
+      border-radius: 8px;
+      padding: 8px;
       text-align: center;
     }
     .person {
-      font-size: 14px;
+      font-size: 16px;
       font-weight: bold;
     }
     .sport,
     .time {
-      font-size: 12px;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -103,8 +102,9 @@
       }
     }
 
-    // Initial load and refresh every 5 minutes
+    // Load on page load
     loadReservations();
+    // Optionally refresh every 5 minutes
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
 </body>
