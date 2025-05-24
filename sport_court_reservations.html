@@ -4,17 +4,23 @@
   <meta charset="UTF-8">
   <title>Today's Sport Court Reservations</title>
   <style>
+    /* make sure nothing ever exceeds our fixed panel width */
     html, body {
-      width: 384px;               /* force fixed panel width */
-      min-width: 384px;
-      max-width: 384px;
-      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      background: transparent;
+    }
+    /* real container: 384px wide, padding included */
+    #wrapper {
+      box-sizing: border-box;
+      width: 384px;
+      height: 100%;
       background-color: #022f6d;
       color: white;
-      margin: 0;
-      padding: 4px 8px;
       font-family: sans-serif;
-      box-sizing: border-box;
+      padding: 4px 4px;
     }
     .separator {
       width: 75%;
@@ -29,7 +35,7 @@
     .header {
       text-align: center;
       font-weight: bold;
-      font-size: 14px;            /* proportional downsize for 384px width */
+      font-size: 12px;    /* ↓ smaller to fit two words cleanly */
       line-height: 1.2;
       margin: 0;
       padding: 2px 0;
@@ -37,13 +43,14 @@
     .reservations {
       display: flex;
       flex-direction: column;
-      gap: 4px;
-      margin-top: 4px;
+      gap: 3px;
+      margin-top: 3px;
     }
     .reservation {
+      box-sizing: border-box;
       border: 1px solid white;
-      border-radius: 6px;
-      padding: 4px;               /* slightly smaller padding */
+      border-radius: 5px;
+      padding: 3px;       /* ↓ tighter padding */
     }
     .basketball {
       background-color: #174A8A;
@@ -51,40 +58,47 @@
     .pickleball {
       background-color: purple;
     }
-    .no-reservation {
-      border: 1px solid white;
-      border-radius: 6px;
-      padding: 4px;
-      background-color: #022f6d;
-      text-align: center;
-    }
     .person {
-      font-size: 12px;            /* proportional downsize */
+      font-size: 10px;    /* ↓ smaller */
       font-weight: bold;
-      margin-bottom: 2px;
+      margin-bottom: 1px;
     }
     .sport,
     .time {
-      font-size: 10px;            /* proportional downsize */
+      font-size: 8px;     /* ↓ smaller */
       margin: 0;
       line-height: 1.2;
+    }
+    .no-reservation {
+      box-sizing: border-box;
+      border: 1px solid white;
+      border-radius: 5px;
+      padding: 3px;
+      text-align: center;
+      background-color: #022f6d;
+      font-size: 10px;
     }
   </style>
 </head>
 <body>
-  <hr class="separator">
-  <div class="header">
-    Today's Sport Court<br>
-    Reservations
+  <div id="wrapper">
+    <hr class="separator">
+    <div class="header">
+      Today's Sport Court<br>
+      Reservations
+    </div>
+    <hr class="separator">
+    <div id="reservations" class="reservations">
+      <!-- Reservations will go here -->
+    </div>
   </div>
-  <hr class="separator">
-  <div id="reservations" class="reservations">
-    <!-- Sport court reservations will be injected here -->
-  </div>
+
   <script>
     async function loadReservations() {
       try {
-        const resp = await fetch('https://pavilion.onrender.com/proxy?facility_id=2027&court_id=15094');
+        const resp = await fetch(
+          'https://pavilion.onrender.com/proxy?facility_id=2027&court_id=15094'
+        );
         const data = await resp.json();
         const container = document.getElementById('reservations');
         container.innerHTML = '';
@@ -93,11 +107,13 @@
           data.reservations.forEach(r => {
             const box = document.createElement('div');
             box.className = 'reservation ' +
-              (r.sport.toLowerCase() === 'basketball' ? 'basketball' : 'pickleball');
+              (r.sport.toLowerCase() === 'basketball'
+                ? 'basketball'
+                : 'pickleball');
             box.innerHTML = `
               <div class="person">${r.person}</div>
               <div class="sport">${r.sport}</div>
-              <div class="time">${r.startTime} - ${r.endTime}</div>
+              <div class="time">${r.startTime} – ${r.endTime}</div>
             `;
             container.appendChild(box);
           });
@@ -112,7 +128,7 @@
       }
     }
 
-    // Initial load + refresh every 5 minutes
+    // load on start, refresh every 5 minutes
     loadReservations();
     setInterval(loadReservations, 5 * 60 * 1000);
   </script>
