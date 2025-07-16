@@ -61,34 +61,23 @@ app.get('/proxy', async (req, res) => {
 app.get('/today-events', async (req, res) => {
   try {
     const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
-    const feedUrl = `https://wildwoodpool.com/wp-admin/admin-ajax.php` +
-      `?action=eventorganiser-fullcal` +
-      `&start=${today}` +
-      `&end=${today}` +
-      `&timeformat=g%3Ai%20A` +
-      `&users_events=false`;
+    const feedUrl =
+      `https://wildwoodpool.com/wp-json/tribe/events/v1/events` +
+      `?start_date=${today}` +
+      `&end_date=${today}`;
 
-    console.log(`Fetching calendar AJAX from ${feedUrl}`);
-    // fetch with browser-like headers so Imunify360 lets us through
-const response = await axios.get(feedUrl, {
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-                  'Chrome/114.0.0.0 Safari/537.36',
-    'Referer':    'https://wildwoodpool.com/calendar/',
-    'Accept':     'application/json, text/javascript, */*; q=0.01'
-  },
-  responseType: 'json',
-  validateStatus: () => true
-});
-if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-const events = response.data;
-    console.log(`Raw events payload:\n`, events);
+    console.log(`[today-events] Fetching REST API from ${feedUrl}`);
 
-    // Map each event, parsing the feed timestamps _as_ America/New_York times
+    const { data } = await axios.get(feedUrl, { timeout: 5000 });
+    console.log(`  → Received ${Array.isArray(data.events)?data.events.length:data.length} items`);
+
+    // The REST API nests events under `data.events`
+    const events = Array.isArray(data.events) ? data.events : data;
+
     const reservations = events.map(ev => {
-      const s = dayjs.tz(ev.start, TIMEZONE).format('h:mmA');
-      const e = dayjs.tz(ev.end,   TIMEZONE).format('h:mmA');
+      // ev.start_date and ev.end_date are ISO strings in local time
+      const s = dayjs(ev.start_date).tz(TIMEZONE).format('h:mmA');
+      const e = dayjs(ev.end_date  ).tz(TIMEZONE).format('h:mmA');
       console.log(`  → ${ev.title}: ${s} – ${e}`);
       return {
         title:     ev.title,
@@ -97,11 +86,14 @@ const events = response.data;
       };
     });
 
-    console.log(`Total events for ${today}: ${reservations.length}`);
+    console.log(`  ✓ Returning ${reservations.length} reservations\n`);
     return res.json({ reservations });
 
   } catch (err) {
     console.error('Error in /today-events:', err.message);
+    if (err.response) {
+      console.error(' Status:', err.response.status, ' Body:', err.response.data);
+    }
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
