@@ -68,7 +68,35 @@ app.get('/today-events', async (req, res) => {
 
     console.log(`[today-events] Fetching REST API from ${feedUrl}`);
 
-    const { data } = await axios.get(feedUrl, { timeout: 5000 });
+    // Step 1: fetch the calendar page to get any session cookies
+const pageResp = await axios.get('https://wildwoodpool.com/calendar/', {
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                  'Chrome/114.0.0.0 Safari/537.36',
+    'Accept':     'text/html,application/xhtml+xml'
+  },
+  withCredentials: true
+});
+const cookies = pageResp.headers['set-cookie'] || [];
+
+// Step 2: fetch the AJAX feed with those cookies and XHR headers
+const response = await axios.get(feedUrl, {
+  headers: {
+    'User-Agent':        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                         'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                         'Chrome/114.0.0.0 Safari/537.36',
+    'Referer':           'https://wildwoodpool.com/calendar/',
+    'Accept':            'application/json, text/javascript, */*; q=0.01',
+    'X-Requested-With':  'XMLHttpRequest',
+    'Cookie':            cookies.join('; ')
+  },
+  responseType:    'json',
+  validateStatus:  () => true
+});
+if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+const events = response.data;
+
     console.log(`  → Received ${Array.isArray(data.events)?data.events.length:data.length} items`);
 
     // The REST API nests events under `data.events`
