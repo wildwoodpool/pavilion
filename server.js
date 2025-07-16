@@ -62,66 +62,65 @@ app.get('/today-events', async (req, res) => {
   try {
     const today = dayjs().tz(TIMEZONE).format('YYYY-MM-DD');
     const feedUrl =
-      `https://wildwoodpool.com/wp-json/tribe/events/v1/events` +
-      `?start_date=${today}` +
-      `&end_date=${today}`;
+      'https://wildwoodpool.com/wp-admin/admin-ajax.php' +
+      `?action=eventorganiser-fullcal` +
+      `&start=${today}` +
+      `&end=${today}` +
+      `&timeformat=g%3Ai%20A` +
+      `&users_events=false`;
 
-    console.log(`[today-events] Fetching REST API from ${feedUrl}`);
+    console.log(`[today-events] Fetching calendar page to get cookies`);
+    const pageResp = await axios.get('https://wildwoodpool.com/calendar/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                      'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                      'Chrome/114.0.0.0 Safari/537.36',
+        'Accept':     'text/html,application/xhtml+xml'
+      },
+      withCredentials: true
+    });
+    const cookies = pageResp.headers['set-cookie'] || [];
+    console.log(`[today-events] Obtained cookies:`, cookies);
 
-    // Step 1: fetch the calendar page to get any session cookies
-const pageResp = await axios.get('https://wildwoodpool.com/calendar/', {
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-                  'Chrome/114.0.0.0 Safari/537.36',
-    'Accept':     'text/html,application/xhtml+xml'
-  },
-  withCredentials: true
-});
-const cookies = pageResp.headers['set-cookie'] || [];
-
-// Step 2: fetch the AJAX feed with those cookies and XHR headers
-const response = await axios.get(feedUrl, {
-  headers: {
-    'User-Agent':        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-                         'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-                         'Chrome/114.0.0.0 Safari/537.36',
-    'Referer':           'https://wildwoodpool.com/calendar/',
-    'Accept':            'application/json, text/javascript, */*; q=0.01',
-    'X-Requested-With':  'XMLHttpRequest',
-    'Cookie':            cookies.join('; ')
-  },
-  responseType:    'json',
-  validateStatus:  () => true
-});
-if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-const events = response.data;
-
-    console.log(`  → Received ${Array.isArray(data.events)?data.events.length:data.length} items`);
-
-    // The REST API nests events under `data.events`
-    const events = Array.isArray(data.events) ? data.events : data;
-
-    const reservations = events.map(ev => {
-      // ev.start_date and ev.end_date are ISO strings in local time
-      const s = dayjs(ev.start_date).tz(TIMEZONE).format('h:mmA');
-      const e = dayjs(ev.end_date  ).tz(TIMEZONE).format('h:mmA');
-      console.log(`  → ${ev.title}: ${s} – ${e}`);
-      return {
-        title:     ev.title,
-        startTime: s,
-        endTime:   e
-      };
+    console.log(`[today-events] Fetching AJAX feed with cookies`);
+    const response = await axios.get(feedUrl, {
+      headers: {
+        'User-Agent':        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                              'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                              'Chrome/114.0.0.0 Safari/537.36',
+        'Referer':           'https://wildwoodpool.com/calendar/',
+        'Accept':            'application/json, text/javascript, */*; q=0.01',
+        'X-Requested-With':  'XMLHttpRequest',
+        'Cookie':            cookies.join('; ')
+      },
+      responseType:   'json',
+      validateStatus: () => true
     });
 
-    console.log(`  ✓ Returning ${reservations.length} reservations\n`);
+    console.log(`[today-events] AJAX HTTP status: ${response.status}`);
+    if (response.status !== 200) {
+      console.error(`[today-events] Blocked or error body:`, response.data);
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const events = response.data;
+    if (!Array.isArray(events)) {
+      console.error(`[today-events] Unexpected payload:`, events);
+      throw new Error('Unexpected feed format');
+    }
+
+    console.log(`[today-events] Received ${events.length} events`);
+    const reservations = events.map(ev => {
+      const s = dayjs.tz(ev.start, TIMEZONE).format('h:mmA');
+      const e = dayjs.tz(ev.end,   TIMEZONE).format('h:mmA');
+      console.log(`[today-events]  → ${ev.title}: ${s} – ${e}`);
+      return { title: ev.title, startTime: s, endTime: e };
+    });
+
     return res.json({ reservations });
 
   } catch (err) {
-    console.error('Error in /today-events:', err.message);
-    if (err.response) {
-      console.error(' Status:', err.response.status, ' Body:', err.response.data);
-    }
+    console.error(`[today-events] Error:`, err.message);
     return res.status(500).json({ error: 'Failed to fetch pool events' });
   }
 });
