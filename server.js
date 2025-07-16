@@ -69,7 +69,20 @@ app.get('/today-events', async (req, res) => {
       `&users_events=false`;
 
     console.log(`Fetching calendar AJAX from ${feedUrl}`);
-    const { data: events } = await axios.get(feedUrl);
+    // fetch with browser-like headers so Imunify360 lets us through
+const response = await axios.get(feedUrl, {
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                  'Chrome/114.0.0.0 Safari/537.36',
+    'Referer':    'https://wildwoodpool.com/calendar/',
+    'Accept':     'application/json, text/javascript, */*; q=0.01'
+  },
+  responseType: 'json',
+  validateStatus: () => true
+});
+if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+const events = response.data;
     console.log(`Raw events payload:\n`, events);
 
     // Map each event, parsing the feed timestamps _as_ America/New_York times
